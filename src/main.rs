@@ -43,13 +43,7 @@ fn init_env_logger() {
 fn main() -> Result<(), Box<dyn Error>> {
     init_env_logger();
     let cli = Cli::parse();
-    let config = match HustoaVmConfig::get_global_config() {
-        Ok(conf) => conf,
-        Err(msg) => {
-            error!("{}", msg);
-            return Err(msg)
-        }
-    };
+    let config = HustoaVmConfig::get_global_config()?;
 
     match &cli.command {
         Some(Commands::Create(args)) => {
