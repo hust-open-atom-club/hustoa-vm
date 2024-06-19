@@ -15,6 +15,7 @@
 ## 构建
 
 ```sh
+apt install libssl-dev pkg-config cloud-image-utils
 cargo build --release
 ```
 
@@ -74,6 +75,13 @@ hustoa-vm v6-pool flush
 ```
 
 对于使用 NetworkManager 管理网络的宿主机，可以将以上内容保存在 `/etc/NetworkManager/dispatcher.d` 中
+
+## 开发/测试状态
+
+已测试的环境：
+
+- Ubuntu 24.04 amd64
+- Debian Bookworm
 
 ## TODO
 
