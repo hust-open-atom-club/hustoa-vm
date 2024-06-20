@@ -217,7 +217,6 @@ impl NewVmInfo {
         let mut params = vec![
             "--connect",
             "qemu:///system",
-            "--import",
             "--memory",
             &memory_in_mb,
             "--vcpus",
