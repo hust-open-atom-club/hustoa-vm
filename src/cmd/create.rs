@@ -339,16 +339,33 @@ struct SourceConfig {
 }
 
 fn gen_package_manager_config_ubuntu(_vminfo: &NewVmInfo) -> Option<APTConfig> {
-    Some(APTConfig {
-        primary: vec![SourceConfig {
-            arches: vec!["default".to_string()],
-            uri: "http://mirrors.hust.edu.cn/ubuntu".to_string(),
-        }],
-        security: vec![SourceConfig {
-            arches: vec!["default".to_string()],
-            uri: "http://security.ubuntu.com/ubuntu".to_string(),
-        }],
-    })
+    match std::env::consts::ARCH {
+        "x86_64" => {
+            Some(APTConfig {
+                primary: vec![SourceConfig {
+                    arches: vec!["default".to_string()],
+                    uri: "http://mirrors.hust.edu.cn/ubuntu".to_string(),
+                }],
+                security: vec![SourceConfig {
+                    arches: vec!["default".to_string()],
+                    uri: "http://security.ubuntu.com/ubuntu".to_string(),
+                }],
+            })
+        },
+        "aarch64" => {
+            Some(APTConfig {
+                primary: vec![SourceConfig {
+                    arches: vec!["default".to_string()],
+                    uri: "http://mirrors.ustc.edu.cn/ubuntu-ports".to_string(),
+                }],
+                security: vec![SourceConfig {
+                    arches: vec!["default".to_string()],
+                    uri: "http://ports.ubuntu.com/ubuntu-ports".to_string(),
+                }],
+            })
+        },
+        _ => None
+    }
 }
 
 fn gen_package_manager_config_debian(_vminfo: &NewVmInfo) -> Option<APTConfig> {
