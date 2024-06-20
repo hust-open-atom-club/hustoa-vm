@@ -9,7 +9,7 @@
 
 设计原则：
 
-- 该工具可与 libvirt 工具（如 virsh、cockpit-machines）配合使用
+- 该工具应与 libvirt 工具（如 virsh、cockpit-machines）配合使用，而不是作为 libvirt 工具的封装
 - 仅为华中科技大学校园内网设计
 
 ## 构建
@@ -23,6 +23,9 @@ cargo build --release
 
 ```sh
 cargo install --path . --root /usr/local
+
+# or just copy the file
+cp ./target/release/hustoa-vm /usr/local/bin/hustoa-vm
 ```
 
 ## 使用方法
@@ -73,11 +76,24 @@ wan_interface = "eth0"
 
 ### 创建虚拟机
 
+**最小化配置：**
+
+下面的命令将创建一个 latest ubuntu server 虚拟机，并具有 60G 磁盘空间、16G 内存和 16 个 vcpu
+
 ```sh
 hustoa-vm create \
   --name sophie \
   --ssh-pubkey ~/.ssh/id_ed25519.pub \
-  --distro ubuntu \
+  --distro ubuntu
+```
+
+**目前支持的完整配置：**
+
+```sh
+hustoa-vm create \
+  --name sophie \
+  --ssh-pubkey ~/.ssh/id_ed25519.pub \
+  --distro ubuntu
   --distro-version jammy \
   --disk-size 60 \
   --memory 16 \
@@ -110,3 +126,4 @@ hustoa-vm v6-pool flush
 - [ ] 批量暂停虚拟机并保存状态
 - [ ] 支持其他发行版的镜像下载与基本配置
 - [ ] 根据 libvirt 的配置删除不需要的 v6 地址
+- [ ] 配置文件中设置默认的磁盘、内存等大小
