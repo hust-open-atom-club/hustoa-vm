@@ -301,7 +301,16 @@ struct EthernetConfig {
     addresses: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    gateway6: Option<Ipv6Addr>
+    routes: Option<Vec<Route>>
+}
+
+#[derive(Debug, Serialize)]
+struct Route {
+    to: String,
+    via: Ipv6Addr,
+
+    #[serde(rename = "on-link")]
+    on_link: bool
 }
 
 fn gen_network_config(vminfo: &NewVmInfo) -> String {
@@ -313,7 +322,11 @@ fn gen_network_config(vminfo: &NewVmInfo) -> String {
                 dhcp4: false,
                 dhcp6: false,
                 addresses: Some(vec![v6addr]),
-                gateway6: Some(ipv6info.v6_gateway),
+                routes: Some(vec![Route {
+                    to: "default".to_string(),
+                    via: ipv6info.v6_gateway,
+                    on_link: true
+                }]),
             })
         },
         None => None
@@ -326,7 +339,7 @@ fn gen_network_config(vminfo: &NewVmInfo) -> String {
                     dhcp4: true,
                     dhcp6: false,
                     addresses: None,
-                    gateway6: None
+                    routes: None
                 },
                 enp2s0: enp2s0_config
             }
