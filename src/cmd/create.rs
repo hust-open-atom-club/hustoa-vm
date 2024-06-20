@@ -228,7 +228,7 @@ impl NewVmInfo {
             &self.vm_name,
             "--disk",
             self.disk_path.to_str().unwrap(),
-            "--disk",
+            "--cdrom",
             self.seed_path.to_str().unwrap(),
             "--network",
             &network_conf1,
@@ -257,6 +257,8 @@ impl NewVmInfo {
             error!("Installation failed");
             return Err("virt-install error".into());
         }
+
+        std::fs::remove_file(&self.seed_path)?;
 
         Ok(())
     }
