@@ -2,7 +2,7 @@
 name = "hustoa-vm"
 version = "0.1.0"
 edition = "2021"
-author = ["Yalong Zou <yalongz@hust.edu.cn>"]
+authors = ["Yalong Zou <yalongz@hust.edu.cn>"]
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
