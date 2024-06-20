@@ -102,7 +102,8 @@ hustoa-vm v6-pool flush
 已测试的环境：
 
 - Ubuntu 24.04 amd64
-- Debian Bookworm
+- Debian Bookworm amd64
+- OpenEuler 22.03 LTS aarch64
 
 ## TODO
 
