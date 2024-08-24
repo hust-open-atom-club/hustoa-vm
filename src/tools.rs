@@ -65,7 +65,7 @@ pub fn virt_install_has_osinfo() -> bool {
             let version_now = String::from_utf8(output.stdout).unwrap();
             let version_now = version_now.replace("\n", "");
             let version_now = Version::parse(&version_now).unwrap();
-            let min_version = Version::parse("4.1.0").unwrap();
+            let min_version = Version::parse("3.0.0").unwrap();
             if min_version > version_now {
                 false
             } else {
