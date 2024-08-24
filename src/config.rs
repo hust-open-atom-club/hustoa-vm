@@ -18,9 +18,6 @@ pub struct CommonConfig {
     #[serde(default = "default_libvirt_storage")]
     pub libvirt_storage: PathBuf,
 
-    #[serde(default = "default_libvirt_save")]
-    pub libvirt_save: PathBuf,
-
     #[serde(default = "default_libvirt_network")]
     pub libvirt_interface: String,
 }
@@ -36,12 +33,9 @@ pub struct Ipv6Config {
     pub wan_interface: String,
 }
 
+
 fn default_libvirt_storage() -> PathBuf {
     PathBuf::from("/var/lib/libvirt/images")
-}
-
-fn default_libvirt_save() -> PathBuf {
-    PathBuf::from("/var/lib/libvirt/qemu/save")
 }
 
 fn default_libvirt_network() -> String {
