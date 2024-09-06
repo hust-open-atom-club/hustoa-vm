@@ -1,7 +1,9 @@
+use std::io::Write;
 use std::net::Ipv6Addr;
 use std::{error::Error, path::PathBuf};
 use clap::Args;
 use log::{debug, info, error};
+use tempfile::NamedTempFile;
 use std::process::Command;
 use filenamify::filenamify;
 use serde::Serialize;
@@ -168,34 +170,29 @@ impl NewVmInfo {
     }
 
     fn prepare_cloud_init_files(&self) -> Result<(), Box<dyn Error>> {
-        let tmp_dir = PathBuf::from("/tmp");
-        let userdata_config = tmp_dir.join(format!("userdata-{}.yaml", self.vm_name));
-        let metadata_config = tmp_dir.join(format!("metadata-{}.yaml", self.vm_name));
-        let network_config = tmp_dir.join(format!("network-{}.yaml", self.vm_name));
+        let mut userdata_config = NamedTempFile::new()?;
+        let mut metadata_config = NamedTempFile::new()?;
+        let mut network_config = NamedTempFile::new()?;
 
-        fs::write(&userdata_config, &self.userdata_conf)?;
-        fs::write(&metadata_config, gen_meta_data_config(self))?;
-        fs::write(&network_config, gen_network_config(self))?;
+        userdata_config.write(self.userdata_conf.as_bytes())?;
+        metadata_config.write(gen_meta_data_config(self).as_bytes())?;
+        network_config.write(gen_network_config(self).as_bytes())?;
 
         let cloud_localds_res = Command::new("cloud-localds")
             .args([
                 "-N",
-                network_config.to_str().unwrap(),
+                network_config.path().to_str().unwrap(),
                 "-d",
                 "qcow2",
                 self.seed_path.to_str().unwrap(),
-                userdata_config.to_str().unwrap(),
-                metadata_config.to_str().unwrap(),
+                userdata_config.path().to_str().unwrap(),
+                metadata_config.path().to_str().unwrap(),
             ]).status()?;
 
         if !cloud_localds_res.success() {
             error!("Generate seed image failed");
             return Err("cloud-localds error".into());
         }
-
-        fs::remove_file(userdata_config)?;
-        fs::remove_file(metadata_config)?;
-        fs::remove_file(network_config)?;
         Ok(())
     }
 
