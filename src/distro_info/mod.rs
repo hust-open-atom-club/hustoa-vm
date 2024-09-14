@@ -20,23 +20,23 @@ pub trait Distro {
     fn gen_cloud_user_data(&self, version: &String, user: &String, pubkey: &String) -> Result<String, Box<dyn Error>>;
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DistroInfoList {
-    distro: Vec<DistroInfo>
+    pub distro: Vec<DistroInfo>
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DistroInfo {
-    name: String,
-    latest_version: String,
-    versions: Vec<VersionInfo>,
+    pub name: String,
+    pub latest_version: String,
+    pub versions: Vec<VersionInfo>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct VersionInfo {
-    name: String,
-    alias: Vec<String>,
-    osinfo_conf: String,
+    pub name: String,
+    pub alias: Vec<String>,
+    pub osinfo_conf: String,
 }
 
 #[derive(Debug, Serialize)]
