@@ -23,6 +23,9 @@ enum Commands {
     /// Delete ipv6 address
     Delete(CmdDelete),
 
+    /// Delete ipv6 address by domain name
+    DeleteByName(CmdDeleteByName),
+
     /// Generate libvirt network define xml for ipv6
     GenV6NetXML(CmdGenerateNetDefine),
 }
@@ -41,7 +44,14 @@ struct CmdAdd {
 
 #[derive(Args)]
 struct CmdDelete {
+    /// IPv6 Address
     addr: Ipv6Addr
+}
+
+#[derive(Args)]
+struct CmdDeleteByName {
+    /// Domain name
+    name: String,
 }
 
 #[derive(Args)]
@@ -74,6 +84,13 @@ fn run_cmd_delete(args: &CmdDelete, config: HustoaVmConfig) -> Result<(), Box<dy
     let _ = config;
     let mut pool = V6Pool::get_pool()?;
     pool.remove_by_addr(&args.addr)?;
+    Ok(())
+}
+
+fn run_cmd_delete_by_name(args: &CmdDeleteByName, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+    let _ = config;
+    let mut pool = V6Pool::get_pool()?;
+    pool.remove_by_name(&args.name)?;
     Ok(())
 }
 
@@ -110,6 +127,7 @@ pub fn run_cmd(args: &SubCmdV6Pool, config: HustoaVmConfig) -> Result<(), Box<dy
         Some(Commands::Flush(subargs)) => run_cmd_flush(subargs, config)?,
         Some(Commands::Add(subargs)) => run_cmd_add(subargs, config)?,
         Some(Commands::Delete(subargs)) => run_cmd_delete(subargs, config)?,
+        Some(Commands::DeleteByName(subargs)) => run_cmd_delete_by_name(subargs, config)?,
         Some(Commands::GenV6NetXML(subargs)) => run_cmd_genv6netxml(subargs, config)?,
         None => {
             error!("Unsupported command.");
