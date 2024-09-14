@@ -140,7 +140,7 @@ impl NewVmInfo {
     fn add_ndp_proxy(&self, config: &HustoaVmConfig) -> Result<(), Box<dyn Error>> {
         if let Some(ipv6conf) = &self.ipv6info {
             let mut pool = V6Pool::get_pool()?;
-            pool.insert(ipv6conf.v6_addr)?;
+            pool.insert(&ipv6conf.v6_addr, &self.vm_name)?;
             pool.flush(config)?;
         }
         Ok(())

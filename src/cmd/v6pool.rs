@@ -32,7 +32,11 @@ struct CmdFlush;
 
 #[derive(Args)]
 struct CmdAdd {
-    addr: Ipv6Addr
+    /// IPv6 Address
+    addr: Ipv6Addr,
+
+    /// Domain name, will be used to delete unused entry
+    domain: String,
 }
 
 #[derive(Args)]
@@ -61,7 +65,7 @@ fn run_cmd_flush(_args: &CmdFlush, config: HustoaVmConfig) -> Result<(), Box<dyn
 
 fn run_cmd_add(args: &CmdAdd, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
     let mut pool = V6Pool::get_pool()?;
-    pool.insert(args.addr)?;
+    pool.insert(&args.addr, &args.domain)?;
     pool.flush(&config)?;
     Ok(())
 }
@@ -69,7 +73,7 @@ fn run_cmd_add(args: &CmdAdd, config: HustoaVmConfig) -> Result<(), Box<dyn Erro
 fn run_cmd_delete(args: &CmdDelete, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
     let _ = config;
     let mut pool = V6Pool::get_pool()?;
-    pool.remove(args.addr)?;
+    pool.remove_by_addr(&args.addr)?;
     Ok(())
 }
 
