@@ -1,7 +1,8 @@
 mod ubuntu;
 
 use std::error::Error;
-use serde::Serialize;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 pub trait Distro {
     /// Get the name of a distribution.
@@ -19,20 +20,24 @@ pub trait Distro {
     fn gen_cloud_user_data(&self, version: &String, user: &String, pubkey: &String) -> Result<String, Box<dyn Error>>;
 }
 
-pub fn get_distro(distro: &String) -> Result<Box<dyn Distro>, Box<dyn Error>> {
-    match distro.as_str() {
-        "ubuntu" => Ok(Box::new(ubuntu::UBUNTU_INFO)),
-        _ => Err("unsupported distro".into())
-    }
+#[derive(Clone, Deserialize)]
+pub struct DistroInfoList {
+    distro: Vec<DistroInfo>
 }
 
-#[derive(Copy, Clone)]
-struct Version<'a> {
-    name: &'a str,
-    alias: &'a [&'a str],
-    osinfo_conf: &'a str,
+#[derive(Clone, Deserialize)]
+pub struct DistroInfo {
+    name: String,
+    latest_version: String,
+    versions: Vec<VersionInfo>,
 }
 
+#[derive(Clone, Deserialize)]
+pub struct VersionInfo {
+    name: String,
+    alias: Vec<String>,
+    osinfo_conf: String,
+}
 
 #[derive(Debug, Serialize)]
 struct UserDataConfig {
@@ -65,4 +70,19 @@ struct APTConfig {
 struct SourceConfig {
     arches: Vec<String>,
     uri: String,
+}
+
+pub fn get_distro(distro: &str) -> Result<Box<dyn Distro>, Box<dyn Error>> {
+    match distro {
+        "ubuntu" => Ok(Box::new(ubuntu::UbuntuInfo::new())),
+        _ => Err("Unknown distribution name".into())
+    }
+}
+
+lazy_static! {
+    pub static ref distro_version: DistroInfoList = {
+        let toml_str = include_str!("version_info.toml");
+        let info: DistroInfoList = toml::from_str(toml_str).expect("init version_info failed");
+        info
+    };
 }

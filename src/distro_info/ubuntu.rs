@@ -3,7 +3,7 @@ use crate::distro_info::*;
 
 #[derive(Copy, Clone)]
 pub struct UbuntuInfo<'a> {
-    valid_versions: &'a [Version<'a>],
+    info: &'a DistroInfo
 }
 
 impl<'a> Distro for UbuntuInfo<'a> {
@@ -17,7 +17,7 @@ impl<'a> Distro for UbuntuInfo<'a> {
     }
 
     fn latest_version(&self) -> String {
-        self.valid_versions[0].name.to_string()
+        self.info.latest_version.clone()
     }
 
     fn get_download_link(&self, version: &String) -> Result<String, Box<dyn Error>> {
@@ -56,6 +56,17 @@ impl<'a> Distro for UbuntuInfo<'a> {
 }
 
 impl<'a> UbuntuInfo<'a> {
+    pub fn new() -> Self {
+        for distro in &distro_version.distro {
+            if distro.name == "ubuntu" {
+                return Self {
+                    info: &distro
+                }
+            }
+        }
+        panic!("ubuntu info not found")
+    }
+
     fn gen_package_manager_config(&self) -> Option<APTConfig> {
         match std::env::consts::ARCH {
             "x86_64" => {
@@ -86,12 +97,13 @@ impl<'a> UbuntuInfo<'a> {
         }
     }
 
-    fn get_version(&self, version: &String) -> Result<Version, Box<dyn Error>> {
-        for item in self.valid_versions {
-            if item.name == version {
+    fn get_version(&self, version: &String) -> Result<VersionInfo, Box<dyn Error>> {
+
+        for item in &self.info.versions {
+            if item.name == *version {
                 return Ok(item.clone());
             }
-            if item.alias.contains(&version.as_str()) {
+            if item.alias.contains(version) {
                 return Ok(item.clone());
             }
         }
@@ -107,62 +119,15 @@ fn get_arch_codename() -> Option<String> {
     }
 }
 
-#[allow(private_interfaces)]
-pub static UBUNTU_INFO: UbuntuInfo = UbuntuInfo {
-    valid_versions: &[
-        Version {
-            name: "noble",
-            alias: &[
-                "24.04"
-            ],
-            osinfo_conf: "ubuntu-stable-latest"
-        },
-        Version {
-            name: "jammy",
-            alias: &[
-                "22.04"
-            ],
-            osinfo_conf: "ubuntujammy"
-        },
-        Version {
-            name: "focal",
-            alias: &[
-                "20.04"
-            ],
-            osinfo_conf: "ubuntufocal"
-        },
-        Version {
-            name: "bionic",
-            alias: &[
-                "18.04"
-            ],
-            osinfo_conf: "ubuntubionic"
-        },
-        // Version {
-        //     name: "xenial",
-        //     alias: &[
-        //         "16.04"
-        //     ],
-        //     osinfo_conf: "ubuntuxenial"
-        // },
-        // Version {
-        //     name: "trusty",
-        //     alias: &[
-        //         "14.04"
-        //     ],
-        //     osinfo_conf: "ubuntutrusty"
-        // },
-    ]
-};
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn get_ubuntu_info() {
-        assert_eq!(UBUNTU_INFO.latest_version(), "noble");
-        assert_eq!(UBUNTU_INFO.get_osinfo_conf(&"focal".to_string()).unwrap(), "ubuntufocal");
-        println!("{}", UBUNTU_INFO.get_download_link(&"24.04".to_string()).unwrap());
+        let ubuntu_info = get_distro("ubuntu").unwrap();
+        assert_eq!(ubuntu_info.latest_version(), "noble");
+        assert_eq!(ubuntu_info.get_osinfo_conf(&"focal".to_string()).unwrap(), "ubuntufocal");
+        println!("{}", ubuntu_info.get_download_link(&"24.04".to_string()).unwrap());
     }
 }
