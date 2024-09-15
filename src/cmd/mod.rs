@@ -8,6 +8,7 @@ pub mod create;
 pub mod v6pool;
 pub mod distro;
 pub mod save_all;
+pub mod restore_all;
 
 #[enum_dispatch(MainCommands)]
 pub trait MainCommandsRun {

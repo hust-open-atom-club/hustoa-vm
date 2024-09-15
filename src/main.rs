@@ -7,6 +7,7 @@ mod distro_info;
 use clap::{Parser, Subcommand};
 use cmd::create::SubCmdCreate;
 use cmd::distro::SubCmdDistro;
+use cmd::restore_all::SubCmdRestoreAll;
 use cmd::save_all::SubCmdSaveAll;
 use cmd::v6pool::SubCmdV6Pool;
 use cmd::MainCommandsRun;
@@ -39,6 +40,9 @@ enum MainCommands {
 
     /// Save all running virsh vms (not only hustoa-vm)
     SaveAll(SubCmdSaveAll),
+
+    /// Restore all running virsh vms (not only hustoa-vm)
+    RestoreAll(SubCmdRestoreAll),
 }
 
 fn init_env_logger() {
