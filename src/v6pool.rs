@@ -2,10 +2,10 @@ use std::error::Error;
 use std::fs::{self, File};
 use std::net::Ipv6Addr;
 use std::path::PathBuf;
-use std::process::Command;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use crate::config::{HustoaVmConfig, Ipv6Config};
+use crate::tools::hustoa_run_cmd;
 
 const V6POOL_PATH: &str = "/etc/hustoa-vm/v6pool.toml";
 
@@ -93,8 +93,7 @@ impl V6Pool {
     }
 
     pub fn purge(&mut self, _: &HustoaVmConfig) -> Result<(), Box<dyn Error>> {
-        let virsh_list = Command::new("virsh")
-            .args([ "list", "--all", "--name" ]).output()?;
+        let virsh_list = hustoa_run_cmd("virsh", [ "list", "--all", "--name" ], false).output()?;
         let mut vms: Vec<String> = String::from_utf8(virsh_list.stdout)?
             .lines()
             .map(|x| x.to_string())
@@ -112,28 +111,26 @@ fn ip_command_mod_one(ipv6conf: &Ipv6Config, addr: &Ipv6Addr, is_add: bool) -> R
 
     let action = if is_add { "add" } else { "del" };
 
-    Command::new("ip")
-    .args([
-        "-6",
-        "neigh",
-        action,
-        "proxy",
-        &addr_str,
-        "dev",
-        &ipv6conf.wan_interface.clone()
-    ])
-    .output()?;
+    hustoa_run_cmd("ip", [
+            "-6",
+            "neigh",
+            action,
+            "proxy",
+            &addr_str,
+            "dev",
+            &ipv6conf.wan_interface.clone()
+        ], false)
+        .output()?;
 
-    Command::new("ip")
-    .args([
-        "-6",
-        "route",
-        action,
-        &addr_str,
-        "dev",
-        &ipv6conf.libvirt_interface_v6
-    ])
-    .output()?;
+    hustoa_run_cmd("ip", [
+            "-6",
+            "route",
+            action,
+            &addr_str,
+            "dev",
+            &ipv6conf.libvirt_interface_v6
+        ], false)
+        .output()?;
 
     debug!("flush addr: {}, is_add: {}", addr, is_add);
 
