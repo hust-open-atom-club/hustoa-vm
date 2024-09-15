@@ -16,7 +16,7 @@ use env_logger;
 use std::env;
 use std::error::Error;
 use log::error;
-use config::HustoaVmConfig;
+use config::{global_config, HustoaVmConfig};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -59,10 +59,9 @@ fn init_env_logger() {
 fn main() -> Result<(), Box<dyn Error>> {
     init_env_logger();
     let cli = Cli::parse();
-    let config = HustoaVmConfig::get_global_config()?;
 
     match cli.command {
-        Some(args) => args.run_cmd(&config)?,
+        Some(args) => args.run_cmd(&global_config)?,
         None => {
             error!("Unsupported command.");
             return Err("argument parser failed".into())

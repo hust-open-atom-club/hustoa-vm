@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::{fs, net::Ipv6Addr};
 use std::error::Error;
 use log::{debug, error};
+use lazy_static::lazy_static;
 
 const DEFAULT_CONFIG_PATH: &str = "/etc/hustoa-vm/config.toml";
 
@@ -23,6 +24,15 @@ pub struct CommonConfig {
 
     #[serde(default = "default_libvirt_network")]
     pub libvirt_interface: String,
+
+    #[serde(default = "default_disk_size")]
+    pub default_disk_size: usize,
+
+    #[serde(default = "default_vcpus")]
+    pub default_vcpus: usize,
+
+    #[serde(default = "default_memory_size")]
+    pub default_memory_size: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,17 +59,39 @@ fn default_libvirt_network() -> String {
     String::from("virbr0")
 }
 
-impl HustoaVmConfig {
-    pub fn get_global_config() -> Result<HustoaVmConfig, Box<dyn Error>> {
-        let toml_str = match fs::read_to_string(DEFAULT_CONFIG_PATH) {
-            Ok(strres) => strres,
-            Err(msg) => {
-                error!("Read config file failed");
-                return Err(Box::new(msg))
+fn default_disk_size() -> usize {
+    80
+}
+
+fn default_vcpus() -> usize {
+    16
+}
+
+fn default_memory_size() ->usize {
+    16
+}
+
+lazy_static! {
+    pub static ref global_config: HustoaVmConfig = {
+        match get_global_config() {
+            Ok(config) => config,
+            Err(err) => {
+                error!("Read config file failed: {}", err);
+                panic!()
             }
-        };
-        let config: HustoaVmConfig = toml::from_str(&toml_str)?;
-        debug!("{:?}", config);
-        Ok(config)
-    }
+        }
+    };
+}
+
+pub fn get_global_config() -> Result<HustoaVmConfig, Box<dyn Error>> {
+    let toml_str = match fs::read_to_string(DEFAULT_CONFIG_PATH) {
+        Ok(strres) => strres,
+        Err(msg) => {
+            error!("Read config file failed");
+            return Err(Box::new(msg))
+        }
+    };
+    let config: HustoaVmConfig = toml::from_str(&toml_str)?;
+    debug!("{:?}", config);
+    Ok(config)
 }

@@ -9,7 +9,7 @@ use filenamify::filenamify;
 use serde::Serialize;
 use serde_yaml;
 use std::{fs, vec};
-use crate::config::HustoaVmConfig;
+use crate::config::{global_config, HustoaVmConfig};
 use crate::tools::{self, hustoa_run_cmd};
 use crate::distro_info;
 use crate::v6pool::V6Pool;
@@ -39,19 +39,31 @@ pub struct SubCmdCreate {
     distro_version: Option<String>,
 
     /// Disk size, in GB
-    #[arg(long, default_value_t = 60)]
-    disk_size: u64,
+    #[arg(long, default_value_t = default_disk_size_arg())]
+    disk_size: usize,
 
     /// Memory size, in GB
-    #[arg(short, long, default_value_t = 16)]
-    memory: u64,
+    #[arg(short, long, default_value_t = default_memory_size_arg())]
+    memory: usize,
 
     /// Number of vcpus
-    #[arg(long, default_value_t = 16)]
+    #[arg(long, default_value_t = default_vcpus_arg())]
     vcpus: usize,
 
     #[arg(long, default_value_t = false)]
     dryrun: bool,
+}
+
+fn default_disk_size_arg() -> usize {
+    global_config.common.default_disk_size
+}
+
+fn default_memory_size_arg() -> usize {
+    global_config.common.default_memory_size
+}
+
+fn default_vcpus_arg() -> usize {
+    global_config.common.default_vcpus
 }
 
 #[derive(Debug)]
