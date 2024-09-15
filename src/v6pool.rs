@@ -30,6 +30,11 @@ impl V6Pool {
             })
         }
         let v6pool_str = fs::read_to_string(V6POOL_PATH)?;
+        if v6pool_str.len() == 0 {
+            return Ok(V6Pool {
+                pool: Vec::new()
+            })
+        }
         let ret: V6Pool = toml::from_str(&v6pool_str)?;
 
         Ok(ret)
@@ -84,6 +89,20 @@ impl V6Pool {
             }
         }
 
+        Ok(())
+    }
+
+    pub fn purge(&mut self, _: &HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+        let virsh_list = Command::new("virsh")
+            .args([ "list", "--all", "--name" ]).output()?;
+        let mut vms: Vec<String> = String::from_utf8(virsh_list.stdout)?
+            .lines()
+            .map(|x| x.to_string())
+            .collect();
+        vms.retain(|x| *x != "");
+
+        self.pool.retain(|x| vms.contains(&x.domain));
+        self.write_back()?;
         Ok(())
     }
 }
