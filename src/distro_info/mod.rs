@@ -1,8 +1,11 @@
 mod ubuntu;
+mod debian;
 
 use std::error::Error;
+use debian::DebianInfo;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use ubuntu::UbuntuInfo;
 
 pub trait Distro {
     /// Get the name of a distribution.
@@ -72,11 +75,34 @@ struct SourceConfig {
     uri: String,
 }
 
-pub fn get_distro(distro: &str) -> Result<Box<dyn Distro>, Box<dyn Error>> {
-    match distro {
-        "ubuntu" => Ok(Box::new(ubuntu::UbuntuInfo::new())),
-        _ => Err("Unknown distribution name".into())
+pub fn get_distro(name: &str) -> Result<Box<dyn Distro>, Box<dyn Error>> {
+    let mut info: Option<&DistroInfo> = None;
+    for distro in &distro_version.distro {
+        if distro.name == name {
+            info = Some(distro);
+            break;
+        }
     }
+    if info.is_none() {
+        return Err("Unsupported distro".into());
+    }
+    match name {
+        "ubuntu" => Ok(Box::new(UbuntuInfo::new(info.unwrap()))),
+        "debian" => Ok(Box::new(DebianInfo::new(info.unwrap()))),
+        _ => return Err("Unsupported distro".into())
+    }
+}
+
+fn get_version(info: &DistroInfo, version: &String) -> Result<VersionInfo, Box<dyn Error>> {
+    for item in &info.versions {
+        if item.name == *version {
+            return Ok(item.clone());
+        }
+        if item.alias.contains(version) {
+            return Ok(item.clone());
+        }
+    }
+    Err(format!("Cannot found version {}", version).into())
 }
 
 lazy_static! {

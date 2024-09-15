@@ -31,3 +31,13 @@ name = "bookworm"
 alias = ["12"]
 # debian12 is not listed in virt-install --osinfo
 osinfo_conf = "debian11"
+
+[[distro.versions]]
+name = "bullseye"
+alias = ["11"]
+osinfo_conf = "debian11"
+
+[[distro.versions]]
+name = "buster"
+alias = ["10"]
+osinfo_conf = "debian10"

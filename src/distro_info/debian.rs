@@ -2,13 +2,13 @@ use std::error::Error;
 use crate::distro_info::*;
 
 #[derive(Copy, Clone)]
-pub struct UbuntuInfo<'a> {
+pub struct DebianInfo<'a> {
     info: &'a DistroInfo
 }
 
-impl<'a> Distro for UbuntuInfo<'a> {
+impl<'a> Distro for DebianInfo<'a> {
     fn name(&self) -> String {
-        "ubuntu".to_string()
+        "debian".to_string()
     }
 
     fn check_version(&self, version: &String) -> Result<String, Box<dyn Error>> {
@@ -21,15 +21,13 @@ impl<'a> Distro for UbuntuInfo<'a> {
     }
 
     fn get_download_link(&self, version: &String) -> Result<String, Box<dyn Error>> {
-        let item = get_version(self.info, version)?;
+        let item = get_version(&self.info, version)?;
         let arch = match get_arch_codename() {
             Some(arch) => arch,
             None => return Err("unsupport arch".into())
         };
 
-        Ok(String::from(format!(
-            "https://mirrors.ustc.edu.cn/ubuntu-cloud-images/{0}/current/{0}-server-cloudimg-{1}.img",
-            item.name, arch)))
+        Ok(String::from(format!("https://cloud.debian.org/images/cloud/{}/latest/debian-{}-generic-{}.qcow2", item.name, item.alias[0], arch)))
     }
 
     fn get_osinfo_conf(&self, version: &String) -> Result<String, Box<dyn Error>> {
@@ -55,7 +53,7 @@ impl<'a> Distro for UbuntuInfo<'a> {
     }
 }
 
-impl<'a> UbuntuInfo<'a> {
+impl<'a> DebianInfo<'a> {
     pub fn new(info: &'a DistroInfo) -> Self {
         Self {
             info
@@ -63,33 +61,16 @@ impl<'a> UbuntuInfo<'a> {
     }
 
     fn gen_package_manager_config(&self) -> Option<APTConfig> {
-        match std::env::consts::ARCH {
-            "x86_64" => {
-                Some(APTConfig {
-                    primary: vec![SourceConfig {
-                        arches: vec!["default".to_string()],
-                        uri: "http://mirrors.hust.edu.cn/ubuntu".to_string(),
-                    }],
-                    security: vec![SourceConfig {
-                        arches: vec!["default".to_string()],
-                        uri: "http://security.ubuntu.com/ubuntu".to_string(),
-                    }],
-                })
-            },
-            "aarch64" => {
-                Some(APTConfig {
-                    primary: vec![SourceConfig {
-                        arches: vec!["default".to_string()],
-                        uri: "http://mirrors.ustc.edu.cn/ubuntu-ports".to_string(),
-                    }],
-                    security: vec![SourceConfig {
-                        arches: vec!["default".to_string()],
-                        uri: "http://ports.ubuntu.com/ubuntu-ports".to_string(),
-                    }],
-                })
-            },
-            _ => None
-        }
+        Some(APTConfig {
+            primary: vec![SourceConfig {
+                arches: vec!["default".to_string()],
+                uri: "http://mirrors.hust.edu.cn/debian".to_string(),
+            }],
+            security: vec![SourceConfig {
+                arches: vec!["default".to_string()],
+                uri: "http://security.debian.org/debian".to_string(),
+            }],
+        })
     }
 }
 
@@ -98,18 +79,5 @@ fn get_arch_codename() -> Option<String> {
         "x86_64" => Some("amd64".to_string()),
         "aarch64" => Some("arm64".to_string()),
         _ => None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn get_ubuntu_info() {
-        let ubuntu_info = get_distro("ubuntu").unwrap();
-        assert_eq!(ubuntu_info.latest_version(), "noble");
-        assert_eq!(ubuntu_info.get_osinfo_conf(&"focal".to_string()).unwrap(), "ubuntufocal");
-        println!("{}", ubuntu_info.get_download_link(&"24.04".to_string()).unwrap());
     }
 }
