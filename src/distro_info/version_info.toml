@@ -41,3 +41,12 @@ osinfo_conf = "debian11"
 name = "buster"
 alias = ["10"]
 osinfo_conf = "debian10"
+
+[[distro]]
+name = "archlinux"
+latest_version = "rolling"
+
+[[distro.versions]]
+name = "rolling"
+alias = []
+osinfo_conf = "archlinux"

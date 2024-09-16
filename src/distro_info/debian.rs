@@ -27,7 +27,7 @@ impl<'a> Distro for DebianInfo<'a> {
             None => return Err("unsupport arch".into())
         };
 
-        Ok(String::from(format!("https://cloud.debian.org/images/cloud/{}/latest/debian-{}-generic-{}.qcow2", item.name, item.alias[0], arch)))
+        Ok(String::from(format!("https://mirrors.ustc.edu.cn/debian-cdimage/cloud/{}/latest/debian-{}-generic-{}.qcow2", item.name, item.alias[0], arch)))
     }
 
     fn get_osinfo_conf(&self, version: &String) -> Result<String, Box<dyn Error>> {
@@ -46,7 +46,10 @@ impl<'a> Distro for DebianInfo<'a> {
                     shell: "/bin/bash".to_string()
                 }
             },
-            apt
+            apt,
+            runcmd: None,
+            cloud_config_modules: None,
+            cloud_final_modules: None,
         };
         let res = serde_yaml::to_string(&config).expect("cannot generate user config");
         Ok("#cloud-config\n".to_string() + &res)

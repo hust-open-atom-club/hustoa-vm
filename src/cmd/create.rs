@@ -11,7 +11,7 @@ use serde_yaml;
 use std::{fs, vec};
 use crate::config::{global_config, HustoaVmConfig};
 use crate::tools::{self, hustoa_run_cmd};
-use crate::distro_info;
+use crate::distro_info::{self, Distro};
 use crate::v6pool::V6Pool;
 
 use super::MainCommandsRun;
@@ -66,14 +66,19 @@ fn default_vcpus_arg() -> usize {
     global_config.common.default_vcpus
 }
 
-#[derive(Debug)]
 struct NewVmInfo {
     vm_name: String,
+    user_name: String,
     host_name: String,
-    download_link: String,
-    virt_inst_osinfo: String,
-    userdata_conf: String,
+
+    ssh_pubkey: String,
+
+    distro: Box<dyn Distro>,
+    distro_version: String,
+
     interface: String,
+    interface_mac: String,
+
     disk_path: PathBuf,
     seed_path: PathBuf,
 
@@ -89,7 +94,7 @@ struct Ipv6Info {
 }
 
 impl NewVmInfo {
-    fn gen_new_vm_info(args: &SubCmdCreate, config: &HustoaVmConfig) -> Result<NewVmInfo, Box<dyn Error>> {
+    fn new(args: &SubCmdCreate, config: &HustoaVmConfig) -> Result<NewVmInfo, Box<dyn Error>> {
         let rand_postfix = tools::gen_rand_postfix();
         let name_strip_space = slugify!(&args.name).replace("-", "_");
 
@@ -103,26 +108,34 @@ impl NewVmInfo {
 
         let ssh_pubkey = fs::read_to_string(&args.ssh_pubkey)?;
 
-        let distro = args.distro.clone();
-        let distro_info = distro_info::get_distro(&distro)?;
+        info!("name: {}", vm_name);
+        info!("user name: {}", user_name);
+        info!("hostname: {}", host_name);
+        info!("ssh pubkey: {}", ssh_pubkey);
+
+        let distro = distro_info::get_distro(&args.distro)?;
         let distro_version = match &args.distro_version {
             Some(version) => {
-                distro_info.check_version(version)?
+                distro.check_version(version)?
             },
             None => {
-                distro_info.latest_version()
+                distro.latest_version()
             }
         };
-        info!("Selecting distro: {}, version: {}", distro, distro_version);
-        let download_link = distro_info.get_download_link(&distro_version)?;
-        let virt_inst_osinfo = distro_info.get_osinfo_conf(&distro_version)?;
-        let userdata_conf = distro_info.gen_cloud_user_data(&distro_version, &user_name, &ssh_pubkey)?;
+        info!("Selecting distro: {}, version: {}", distro.name(), distro_version);
 
         let disk_name = format!("{}.img", vm_name);
         let disk_path = config.common.libvirt_storage.join(disk_name);
         let seed_name = format!("seed-{}.img", vm_name);
         let seed_path = config.common.libvirt_storage.join(seed_name);
+
+        debug!("disk path: {:?}", disk_path);
+        debug!("seed path: {:?}", seed_path);
+
         let interface = config.common.libvirt_interface.clone();
+        let interface_mac = tools::gen_mac_address_qemu();
+
+        debug!("interface mac address: {}", interface_mac);
 
         let mut ipv6info: Option<Ipv6Info> = None;
 
@@ -135,18 +148,22 @@ impl NewVmInfo {
                     v6_gateway: tools::generate_eui64_from_mac(&ipv6conf.ipv6_bridge_mac,
                         Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 0))?,
                     v6_addr: tools::generate_eui64_from_mac(&mac, ipv6conf.ipv6_prefix)?
-                })
+                });
+
+                debug!("IPv6 info: {:?}", ipv6info);
             },
             None => {}
         }
 
         Ok(NewVmInfo {
             vm_name,
+            user_name,
             host_name,
-            download_link,
-            virt_inst_osinfo,
-            userdata_conf,
+            ssh_pubkey,
+            distro,
+            distro_version,
             interface,
+            interface_mac,
             disk_path,
             seed_path,
             ipv6info,
@@ -163,11 +180,12 @@ impl NewVmInfo {
     }
 
     fn prepare_disk(&self, args: &SubCmdCreate) -> Result<(), Box<dyn Error>> {
-        info!("Downloading disk file {}", self.download_link);
+        let download_link = self.distro.get_download_link(&self.distro_version)?;
+        info!("Downloading disk file {}", download_link);
         let wget_res = hustoa_run_cmd("wget", [
                 "-O",
                 self.disk_path.to_str().unwrap(),
-                &self.download_link
+                download_link.as_str(),
             ], args.dryrun).status()?;
         if wget_res.success() {
             info!("Download complete");
@@ -190,14 +208,69 @@ impl NewVmInfo {
         Ok(())
     }
 
+    fn gen_meta_data_config(&self) -> String {
+        let config = MetaDataConfig {
+            instance_id: self.vm_name.clone(),
+            local_hostname: self.host_name.clone(),
+        };
+        let res = serde_yaml::to_string(&config).expect("cannot generate meta data config");
+        "#cloud-config\n".to_string() + &res
+    }
+
+    fn gen_network_config(&self) -> String {
+        let enp2s0_config = match &self.ipv6info {
+            Some(ipv6info) => {
+                let v6addr = ipv6info.v6_addr.to_string();
+                let v6addr = v6addr + "/64";
+                Some(EthernetConfig {
+                    dhcp4: false,
+                    dhcp6: false,
+                    r#match: MatchItem { macaddress: format!("{}", ipv6info.v6_net_mac) },
+                    // set_name: "enp2s0".to_string(),
+                    addresses: Some(vec![v6addr]),
+                    routes: Some(vec![Route {
+                        to: "::/0".to_string(),
+                        via: ipv6info.v6_gateway,
+                        // on_link: true
+                    }]),
+                })
+            },
+            None => None
+        };
+        let config = NetworkConfig {
+            network: Network {
+                version: 2,
+                ethernets: Ethernets {
+                    enp1s0: EthernetConfig {
+                        dhcp4: true,
+                        dhcp6: false,
+                        r#match: MatchItem { macaddress: format!("{}", self.interface_mac) },
+                        // set_name: "enp1s0".to_string(),
+                        addresses: None,
+                        routes: None
+                    },
+                    enp2s0: enp2s0_config
+                }
+            }
+        };
+        let res = serde_yaml::to_string(&config).expect("cannot generate network config");
+        "#cloud-config\n".to_string() + &res
+    }
+
     fn prepare_cloud_init_files(&self, args: &SubCmdCreate) -> Result<(), Box<dyn Error>> {
         let mut userdata_config = NamedTempFile::new()?;
         let mut metadata_config = NamedTempFile::new()?;
         let mut network_config = NamedTempFile::new()?;
 
-        userdata_config.write(self.userdata_conf.as_bytes())?;
-        metadata_config.write(gen_meta_data_config(self).as_bytes())?;
-        network_config.write(gen_network_config(self).as_bytes())?;
+        let userdata = &self.distro.gen_cloud_user_data(&self.distro_version,
+                &self.user_name, &self.ssh_pubkey)?;
+        let metadata = self.gen_meta_data_config();
+        let network = self.gen_network_config();
+        debug!("userdata:\n{}\nmetadata:\n{}\nnetwork:{}\n", userdata, metadata, network);
+
+        userdata_config.write(userdata.as_bytes())?;
+        metadata_config.write(metadata.as_bytes())?;
+        network_config.write(network.as_bytes())?;
 
         let cloud_localds_res = hustoa_run_cmd("cloud-localds", [
                 "-N",
@@ -221,7 +294,7 @@ impl NewVmInfo {
         let memory_in_mb = args.memory * 1024;
         let memory_in_mb = memory_in_mb.to_string();
         let vcpus = args.vcpus.to_string();
-        let network_conf1 = format!("bridge={}", self.interface);
+        let network_conf1 = format!("bridge={},mac={}", self.interface, self.interface_mac);
         let network_conf2;
 
         let mut params = vec![
@@ -252,9 +325,11 @@ impl NewVmInfo {
             params.push(&network_conf2);
         }
 
+        let virt_inst_osinfo = self.distro.get_osinfo_conf(&self.distro_version)?;
+
         if has_osinfo {
             params.push("--osinfo");
-            params.push(&self.virt_inst_osinfo);
+            params.push(virt_inst_osinfo.as_str());
         }
 
         debug!("virt-install params: {:?}", params);
@@ -282,15 +357,6 @@ struct MetaDataConfig {
     local_hostname: String
 }
 
-fn gen_meta_data_config(vminfo: &NewVmInfo) -> String {
-    let config = MetaDataConfig {
-        instance_id: vminfo.vm_name.clone(),
-        local_hostname: vminfo.host_name.clone(),
-    };
-    let res = serde_yaml::to_string(&config).expect("cannot generate meta data config");
-    "#cloud-config\n".to_string() + &res
-}
-
 #[derive(Debug, Serialize)]
 struct NetworkConfig {
     network: Network
@@ -314,6 +380,11 @@ struct EthernetConfig {
     dhcp4: bool,
     dhcp6: bool,
 
+    r#match: MatchItem,
+
+    // #[serde(rename(serialize = "set-name"))]
+    // set_name: String,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     addresses: Option<Vec<String>>,
 
@@ -322,48 +393,17 @@ struct EthernetConfig {
 }
 
 #[derive(Debug, Serialize)]
+struct MatchItem {
+    macaddress: String
+}
+
+#[derive(Debug, Serialize)]
 struct Route {
     to: String,
     via: Ipv6Addr,
 
-    #[serde(rename = "on-link")]
-    on_link: bool
-}
-
-fn gen_network_config(vminfo: &NewVmInfo) -> String {
-    let enp2s0_config = match &vminfo.ipv6info {
-        Some(ipv6info) => {
-            let v6addr = ipv6info.v6_addr.to_string();
-            let v6addr = v6addr + "/64";
-            Some(EthernetConfig {
-                dhcp4: false,
-                dhcp6: false,
-                addresses: Some(vec![v6addr]),
-                routes: Some(vec![Route {
-                    to: "default".to_string(),
-                    via: ipv6info.v6_gateway,
-                    on_link: true
-                }]),
-            })
-        },
-        None => None
-    };
-    let config = NetworkConfig {
-        network: Network {
-            version: 2,
-            ethernets: Ethernets {
-                enp1s0: EthernetConfig {
-                    dhcp4: true,
-                    dhcp6: false,
-                    addresses: None,
-                    routes: None
-                },
-                enp2s0: enp2s0_config
-            }
-        }
-    };
-    let res = serde_yaml::to_string(&config).expect("cannot generate network config");
-    "#cloud-config\n".to_string() + &res
+    // #[serde(rename = "on-link")]
+    // on_link: bool
 }
 
 impl SubCmdCreate {
@@ -392,8 +432,7 @@ impl SubCmdCreate {
 
 impl MainCommandsRun for SubCmdCreate {
     fn run_cmd(&self, config: &HustoaVmConfig) -> Result<(), Box<dyn Error>> {
-        let vminfo = NewVmInfo::gen_new_vm_info(self, &config)?;
-        debug!("get vm info: {:?}", vminfo);
+        let vminfo = NewVmInfo::new(self, &config)?;
 
         match self.do_create(&vminfo, config) {
             Ok(_) => Ok(()),
