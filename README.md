@@ -81,7 +81,7 @@ libvirt_interface_v6 = "virbr1"
 # 上述网络接口的 mac 地址
 ipv6_bridge_mac = "52:54:00:48:8b:aa"
 # host 所在网段的 ipv6 地址前缀
-ipv6_prefix = "2001:250:4000:511d::"
+ipv6_prefix = "2001:250:4000:5111::"
 # host 出口网络 interface
 wan_interface = "eth0"
 ```
@@ -92,7 +92,7 @@ wan_interface = "eth0"
 
 **最小化配置：**
 
-下面的命令将创建一个 latest ubuntu server 虚拟机，并具有 60G 磁盘空间、16G 内存和 16 个 vcpu
+下面的命令将创建一个 latest ubuntu server 虚拟机
 
 ```sh
 hustoa-vm create \
@@ -110,12 +110,20 @@ hustoa-vm create \
   --ssh-pubkey ~/.ssh/id_ed25519.pub \
   --distro ubuntu
   --distro-version jammy \
-  --disk-size 60 \
+  --disk-size 80 \
   --memory 16 \
   --vcpus 16
 ```
 
 按需调整配置即可。如果提供了 `--user` 选项，创建虚拟机时使用的默认用户名则来源于该选项，否则将 fallback 到 `--name` 的值。
+
+**发行版支持**
+
+使用如下命令可列出当前工具支持的 Linux 发行版本：
+
+```bash
+hustoa-vm distro
+```
 
 ### 持久化 ipv6 配置
 
