@@ -18,6 +18,9 @@ pub struct SubCmdV6Pool {
 #[derive(Subcommand)]
 #[enum_dispatch]
 enum V6PoolCommands {
+    /// List the managed ipv6 addresses
+    List(CmdList),
+
     /// Reload the ipv6 configuration
     Flush(CmdFlush),
 
@@ -42,6 +45,17 @@ trait V6PoolCommandsRun {
     fn run_cmd(&self, config: &HustoaVmConfig) -> Result<(), Box<dyn Error>>;
 }
 
+
+#[derive(Args)]
+struct CmdList;
+
+impl V6PoolCommandsRun for CmdList {
+    fn run_cmd(&self, _config: &HustoaVmConfig) -> Result<(),Box<dyn Error>> {
+        let pool = V6Pool::get_pool()?;
+        pool.print();
+        Ok(())
+    }
+}
 
 #[derive(Args)]
 struct CmdFlush;

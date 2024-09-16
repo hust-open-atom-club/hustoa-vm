@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::net::Ipv6Addr;
 use std::path::PathBuf;
 use std::str::FromStr;
+use colored::Colorize;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use crate::config::{HustoaVmConfig, Ipv6Config};
@@ -43,6 +44,12 @@ impl V6Pool {
         ret.migrate_deprecated_file();
 
         Ok(ret)
+    }
+
+    pub fn print(&self) {
+        for item in &self.pool {
+            println!("domain: {}\n  - {}\n", item.domain.green(), item.addr)
+        }
     }
 
     fn write_back(&self) -> Result<(), Box <dyn Error>> {
