@@ -106,7 +106,7 @@ impl NewVmInfo {
 
         let host_name = format!("{}-{}-{}", name_strip_space, args.distro, rand_postfix);
 
-        let ssh_pubkey = fs::read_to_string(&args.ssh_pubkey)?;
+        let ssh_pubkey = fs::read_to_string(&args.ssh_pubkey)?.replace("\n", "");
 
         info!("name: {}", vm_name);
         info!("user name: {}", user_name);
