@@ -2,12 +2,15 @@ use std::error::Error;
 use std::fs::{self, File};
 use std::net::Ipv6Addr;
 use std::path::PathBuf;
-use log::{debug, error};
+use std::str::FromStr;
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use crate::config::{HustoaVmConfig, Ipv6Config};
 use crate::tools::hustoa_run_cmd;
 
 const V6POOL_PATH: &str = "/etc/hustoa-vm/v6pool.toml";
+
+const V6POOL_PATH_DEPRECATED: &str = "/etc/hustoa-vm/v6pool.list";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V6Pool {
@@ -35,7 +38,9 @@ impl V6Pool {
                 pool: Vec::new()
             })
         }
-        let ret: V6Pool = toml::from_str(&v6pool_str)?;
+        let mut ret: V6Pool = toml::from_str(&v6pool_str)?;
+
+        ret.migrate_deprecated_file();
 
         Ok(ret)
     }
@@ -44,6 +49,33 @@ impl V6Pool {
         let str = toml::to_string(&self)?;
         std::fs::write(V6POOL_PATH, str)?;
         Ok(())
+    }
+
+    fn migrate_deprecated_file(&mut self) {
+        let mut count = 0;
+        if PathBuf::from(V6POOL_PATH_DEPRECATED).is_file() {
+            if let Ok(lines) = fs::read_to_string(V6POOL_PATH_DEPRECATED) {
+                for item in lines.lines() {
+                    if item == "" {
+                        continue;
+                    }
+                    let addr = match Ipv6Addr::from_str(item) {
+                        Ok(addr) => addr,
+                        Err(_) => continue,
+                    };
+                    if self.insert(&addr, &format!("unknwon-{}", addr)).is_ok() {
+                        warn!("migrating ipv6 address {}", item);
+                        count += 1;
+                    }
+                }
+            }
+        }
+        let _ = fs::remove_file(V6POOL_PATH_DEPRECATED);
+        if count != 0 {
+            warn!(
+                "Migrate {} addresses to {}, do not run v6-pool purge before setting domain name manually",
+                count, V6POOL_PATH);
+        }
     }
 
     pub fn insert(&mut self, addr: &Ipv6Addr, domain: &String) -> Result<(), Box<dyn Error>> {
@@ -60,7 +92,7 @@ impl V6Pool {
                 return Err("insert v6pool item failed".into());
             }
             if item.domain == *domain {
-                error!("Same ipv6 address but different domain name");
+                error!("Same domain name but different ipv6 address");
                 return Err("insert v6pool item failed".into());
             }
         }
@@ -100,7 +132,13 @@ impl V6Pool {
             .collect();
         vms.retain(|x| *x != "");
 
-        self.pool.retain(|x| vms.contains(&x.domain));
+        self.pool.retain(|x| {
+            let exist = vms.contains(&x.domain);
+            if ! exist {
+                info!("deleting ipv6 entry: {} domain: {}", x.addr, x.domain)
+            }
+            exist
+        });
         self.write_back()?;
         Ok(())
     }
