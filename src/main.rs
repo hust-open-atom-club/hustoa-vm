@@ -60,8 +60,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     init_env_logger();
     let cli = Cli::parse();
 
+    let config_res: &Result<HustoaVmConfig, Box<dyn Error + Send + Sync>> = &global_config;
+    let config = match config_res {
+        Ok(config) => config,
+        Err(err) => {
+            error!("{err}");
+            return Err("Error on parse config file".into());
+        }
+    };
+
     match cli.command {
-        Some(args) => args.run_cmd(&global_config)?,
+        Some(args) => args.run_cmd(&config)?,
         None => {
             error!("Unsupported command.");
             return Err("argument parser failed".into())

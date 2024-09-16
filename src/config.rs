@@ -59,31 +59,23 @@ fn default_libvirt_network() -> String {
     String::from("virbr0")
 }
 
-fn default_disk_size() -> usize {
+pub fn default_disk_size() -> usize {
     80
 }
 
-fn default_vcpus() -> usize {
+pub fn default_vcpus() -> usize {
     16
 }
 
-fn default_memory_size() ->usize {
+pub fn default_memory_size() ->usize {
     16
 }
 
 lazy_static! {
-    pub static ref global_config: HustoaVmConfig = {
-        match get_global_config() {
-            Ok(config) => config,
-            Err(err) => {
-                error!("Read config file failed: {}", err);
-                panic!()
-            }
-        }
-    };
+    pub static ref global_config: Result<HustoaVmConfig, Box<dyn Error + Send + Sync>> = get_global_config();
 }
 
-pub fn get_global_config() -> Result<HustoaVmConfig, Box<dyn Error>> {
+pub fn get_global_config() -> Result<HustoaVmConfig, Box<dyn Error + Send + Sync>> {
     let toml_str = match fs::read_to_string(DEFAULT_CONFIG_PATH) {
         Ok(strres) => strres,
         Err(msg) => {
