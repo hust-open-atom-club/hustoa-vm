@@ -27,7 +27,7 @@ impl<'a> Distro for DebianInfo<'a> {
             None => return Err("unsupport arch".into())
         };
 
-        Ok(String::from(format!("https://mirrors.ustc.edu.cn/debian-cdimage/cloud/{}/latest/debian-{}-generic-{}.qcow2", item.name, item.alias[0], arch)))
+        Ok(String::from(format!("https://cloud.debian.org/images/cloud/{}/latest/debian-{}-generic-{}.qcow2", item.name, item.alias[0], arch)))
     }
 
     fn get_osinfo_conf(&self, version: &String) -> Result<String, Box<dyn Error>> {
