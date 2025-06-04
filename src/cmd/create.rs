@@ -7,7 +7,7 @@ use log::{debug, info, error};
 use tempfile::NamedTempFile;
 use slugify::slugify;
 use serde::Serialize;
-use serde_yaml;
+use serde_yml;
 use std::{fs, vec};
 use crate::config::{default_disk_size, default_memory_size, default_vcpus, global_config, HustoaVmConfig};
 use crate::tools::{self, hustoa_run_cmd};
@@ -225,7 +225,7 @@ impl NewVmInfo {
             instance_id: self.vm_name.clone(),
             local_hostname: self.host_name.clone(),
         };
-        let res = serde_yaml::to_string(&config).expect("cannot generate meta data config");
+        let res = serde_yml::to_string(&config).expect("cannot generate meta data config");
         "#cloud-config\n".to_string() + &res
     }
 
@@ -265,7 +265,7 @@ impl NewVmInfo {
                 }
             }
         };
-        let res = serde_yaml::to_string(&config).expect("cannot generate network config");
+        let res = serde_yml::to_string(&config).expect("cannot generate network config");
         "#cloud-config\n".to_string() + &res
     }
 
