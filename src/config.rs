@@ -23,7 +23,7 @@ pub struct CommonConfig {
     pub libvirt_save: PathBuf,
 
     #[serde(default = "default_libvirt_network")]
-    pub libvirt_interface: String,
+    pub libvirt_network: String,
 
     #[serde(default = "default_disk_size")]
     pub default_disk_size: usize,
@@ -56,7 +56,7 @@ fn default_libvirt_save() -> PathBuf {
 }
 
 fn default_libvirt_network() -> String {
-    String::from("virbr0")
+    String::from("default")
 }
 
 pub fn default_disk_size() -> usize {

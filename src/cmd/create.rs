@@ -144,7 +144,7 @@ impl NewVmInfo {
         debug!("disk path: {:?}", disk_path);
         debug!("seed path: {:?}", seed_path);
 
-        let interface = config.common.libvirt_interface.clone();
+    let interface = config.common.libvirt_network.clone();
         let interface_mac = tools::gen_mac_address_qemu();
 
         debug!("interface mac address: {}", interface_mac);
@@ -306,7 +306,7 @@ impl NewVmInfo {
         let memory_in_mb = args.memory * 1024;
         let memory_in_mb = memory_in_mb.to_string();
         let vcpus = args.vcpus.to_string();
-        let network_conf1 = format!("bridge={},mac={}", self.interface, self.interface_mac);
+        let network_conf1 = format!("network={},mac={}", self.interface, self.interface_mac);
         let network_conf2;
 
         let mut params = vec![
@@ -433,6 +433,30 @@ impl SubCmdCreate {
 
         info!("Perform vm installation");
         vminfo.install(self)?;
+
+        // After installation, try to resolve IPv4 via libvirt DHCP leases using the interface MAC.
+        // Use libvirt network name from config.common.libvirt_interface if possible, else fallback to "default".
+    let network_for_dhcp = &config.common.libvirt_network;
+        let network_name = if network_for_dhcp.is_empty() { "default" } else { network_for_dhcp.as_str() };
+
+        // Timeout for lease resolution (seconds)
+        let timeout = 30;
+        let ipv4 = match tools::resolve_ip_via_dhcp_leases(&vminfo.interface_mac, network_name, timeout) {
+            Some(ip) => {
+                info!("Resolved IPv4 for {}: {}", vminfo.vm_name, ip);
+                ip
+            },
+            None => {
+                error!("Failed to resolve IPv4 for {} via DHCP leases (network {}).", vminfo.vm_name, network_name);
+                String::new()
+            }
+        };
+
+        // Save VM entry to /etc/hustoa-vm/vmlist.toml (ignore errors but log them)
+        let distro_info = format!("{}:{}", vminfo.distro.name(), vminfo.distro_version);
+        if let Err(e) = tools::save_vm_entry_vmlist(&vminfo.vm_name, &vminfo.user_name, &distro_info, &vminfo.disk_path.to_string_lossy(), &ipv4) {
+            error!("Failed to save VM entry to vmlist: {}", e);
+        }
 
         info!("Installation complete");
         if let Some(ipv6info) = &vminfo.ipv6info {
