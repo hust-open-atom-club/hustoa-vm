@@ -66,8 +66,8 @@ net.ipv6.conf.all.proxy_ndp = 1
 libvirt_storage = "/var/lib/libvirt/images"
 # libvirt 默认保存虚拟机状态的文件夹，默认值为 /var/lib/libvirt/qemu/save
 libvirt_save = "/var/lib/libvirt/qemu/save"
-# 创建虚拟机使用的默认网络接口，默认为 virbr0
-libvirt_interface = "virbr0"
+# 创建虚拟机使用的默认 libvirt 网络名，默认为 default
+libvirt_network = "default"
 
 # hustoa-vm create 默认使用的磁盘镜像大小，单位为 GiB
 default_disk_size = 80
@@ -110,7 +110,7 @@ hustoa-vm create \
   --name sophie \
   --user sophie \
   --ssh-pubkey ~/.ssh/id_ed25519.pub \
-  --distro ubuntu
+  --distro ubuntu \
   --distro-version jammy \
   --disk-size 80 \
   --memory 16 \

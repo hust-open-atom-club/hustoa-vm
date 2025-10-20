@@ -1,5 +1,6 @@
 use std::{ffi::OsStr, fmt::{Debug, Display}, net::Ipv6Addr};
 use rand::{self, Rng};
+use std::net::TcpListener;
 use std::error::Error;
 use semver::Version;
 use std::process::Command;
@@ -159,5 +160,63 @@ pub fn save_vm_entry_vmlist(name: &str, user: &str, distro: &str, disk_path: &st
 
     let out = toml::to_string_pretty(&table)?;
     fs::write(&file_path, out)?;
+    Ok(())
+}
+
+// Allocate a free host TCP port in the ephemeral range for SSH forwarding.
+pub fn allocate_host_port() -> Result<u16, Box<dyn std::error::Error>> {
+    let mut rng = rand::thread_rng();
+    for _ in 0..100 {
+        let port: u16 = rng.gen_range(20000..30000);
+        let addr = format!("0.0.0.0:{}", port);
+        match TcpListener::bind(&addr) {
+            Ok(listener) => {
+                // Successfully bound, drop listener to free port and return value
+                drop(listener);
+                return Ok(port);
+            }
+            Err(_) => continue,
+        }
+    }
+    Err("failed to allocate free port".into())
+}
+
+// Add a port mapping to an existing VM entry in vmlist.toml. Creates the file/entry if needed.
+pub fn add_port_mapping_vmlist(name: &str, host_port: u16, guest_port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    let dir = std::path::Path::new("/etc/hustoa-vm");
+    if !dir.exists() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let file_path = dir.join("vmlist.toml");
+    let mut table = if file_path.exists() {
+        let s = std::fs::read_to_string(&file_path)?;
+        toml::from_str::<toml::Value>(&s)?
+    } else {
+        toml::Value::Table(toml::map::Map::new())
+    };
+
+    let port_entry = {
+        let mut m = toml::map::Map::new();
+        m.insert("host".to_string(), toml::Value::Integer(host_port as i64));
+        m.insert("guest".to_string(), toml::Value::Integer(guest_port as i64));
+        toml::Value::Table(m)
+    };
+
+    if let toml::Value::Table(ref mut t) = table {
+        let vm_entry = t.entry(name.to_string()).or_insert_with(|| toml::Value::Table(toml::map::Map::new()));
+        if let toml::Value::Table(ref mut vm_table) = vm_entry {
+            match vm_table.get_mut("ports") {
+                Some(toml::Value::Array(arr)) => {
+                    arr.push(port_entry);
+                }
+                _ => {
+                    vm_table.insert("ports".to_string(), toml::Value::Array(vec![port_entry]));
+                }
+            }
+        }
+    }
+
+    let out = toml::to_string_pretty(&table)?;
+    std::fs::write(&file_path, out)?;
     Ok(())
 }

@@ -11,6 +11,8 @@ use cmd::restore_all::SubCmdRestoreAll;
 use cmd::save_all::SubCmdSaveAll;
 use cmd::v6pool::SubCmdV6Pool;
 use cmd::self_update::SubCmdSelfUpdate;
+use cmd::install_hook::SubCmdInstallHook;
+use cmd::hook::SubCmdHook;
 use cmd::MainCommandsRun;
 use enum_dispatch::enum_dispatch;
 use env_logger;
@@ -47,6 +49,12 @@ enum MainCommands {
 
     /// Self update the binary from GitHub releases
     SelfUpdate(SubCmdSelfUpdate),
+
+    /// Install libvirt hook script for NAT port forwarding
+    InstallHook(SubCmdInstallHook),
+
+    /// libvirt hook entry point (invoked by wrapper)
+    Hook(SubCmdHook),
 }
 
 fn init_env_logger() {

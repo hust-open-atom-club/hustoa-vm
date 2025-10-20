@@ -458,6 +458,58 @@ impl SubCmdCreate {
             error!("Failed to save VM entry to vmlist: {}", e);
         }
 
+        // allocate a host port for SSH forwarding and record it to vmlist
+        match tools::allocate_host_port() {
+            Ok(port) => {
+                let mut added_to_vmlist = false;
+                if let Err(e) = tools::add_port_mapping_vmlist(&vminfo.vm_name, port, 22) {
+                    error!("Failed to add port mapping to vmlist: {}", e);
+                } else {
+                    info!("Added port mapping {}->22 for {}", port, vminfo.vm_name);
+                    added_to_vmlist = true;
+                }
+
+                // If we have resolved an IPv4 address, add iptables DNAT rule immediately
+                if added_to_vmlist && !ipv4.is_empty() {
+                    use std::process::Command;
+                    let dst = format!("{}:22", ipv4);
+                    // create chain if not exists (ignore error if exists)
+                    let _ = Command::new("iptables").args(["-t", "nat", "-N", "HUSTOA_VM"]).status();
+                    // ensure PREROUTING jumps to chain
+                    let jump_exists = Command::new("iptables").args(["-t", "nat", "-C", "PREROUTING", "-j", "HUSTOA_VM"]).status()
+                        .map(|s| s.success()).unwrap_or(false);
+                    if !jump_exists {
+                        let _ = Command::new("iptables").args(["-t", "nat", "-I", "PREROUTING", "-j", "HUSTOA_VM"]).status();
+                    }
+                    let res = Command::new("iptables").args([
+                        "-t", "nat", "-A", "HUSTOA_VM",
+                        "-p", "tcp", "--dport", &port.to_string(),
+                        "-j", "DNAT", "--to-destination", &dst
+                    ]).status();
+
+                    match res {
+                        Ok(st) if st.success() => info!("iptables rule added for {} -> {}", port, dst),
+                        Ok(st) => error!("iptables exited with status: {}", st),
+                        Err(e) => error!("Failed to run iptables: {}", e),
+                    }
+                    // ensure FORWARD allows traffic to guest
+                    let forward_check = Command::new("iptables").args([
+                        "-C", "FORWARD", "-d", &ipv4, "-p", "tcp", "--dport", "22", "-j", "ACCEPT"
+                    ]).status().map(|s| s.success()).unwrap_or(false);
+                    if !forward_check {
+                        let _ = Command::new("iptables").args([
+                            "-I", "FORWARD", "-d", &ipv4, "-p", "tcp", "--dport", "22", "-j", "ACCEPT"
+                        ]).status();
+                    }
+                } else if added_to_vmlist {
+                    info!("IPv4 not resolved yet, will rely on hook to apply iptables when VM starts");
+                }
+            }
+            Err(e) => {
+                error!("Failed to allocate host port for SSH forwarding: {}", e);
+            }
+        }
+
         info!("Installation complete");
         if let Some(ipv6info) = &vminfo.ipv6info {
             info!("Ipv6 address: {}", ipv6info.v6_addr);
