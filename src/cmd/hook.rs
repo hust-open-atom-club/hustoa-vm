@@ -6,12 +6,17 @@ use log::info;
 use std::process::Command;
 
 #[derive(Args)]
+#[clap(trailing_var_arg = true)]
 pub struct SubCmdHook {
     /// Domain name passed from libvirt
     pub domain: Option<String>,
 
     /// Action passed from libvirt (e.g. prepare, release)
     pub action: Option<String>,
+
+    /// Capture and ignore any extra arguments libvirt may pass (e.g. begin/end, "-")
+    /// This prevents clap from erroring on unexpected trailing args.
+    pub _extra: Vec<String>,
 }
 
 impl MainCommandsRun for SubCmdHook {
