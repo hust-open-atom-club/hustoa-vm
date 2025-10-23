@@ -258,7 +258,6 @@ impl NewVmInfo {
             return Err("virt-install error".into());
         }
 
-        fs::remove_file(self.seed_path.clone())?;
         Ok(())
     }
 }
