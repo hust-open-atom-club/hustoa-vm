@@ -27,6 +27,27 @@ cargo install --path . --root /usr/local
 
 ## 使用方法
 
+### 设置网络环境
+
+如果需要使用 ipv6，需要在 libvirt 中添加一个仅 v6 的网络，其 xml 描述如下：
+
+```xml
+<network>
+  <name>default-v6</name>
+  <forward mode='open'/>
+  <bridge name='virbr1' stp='on' delay='0'/>
+  <domain name='default-v6' localOnly='yes'/>
+  <ip family='ipv6' address='2001:250:4000:5111:1234:abcd:3123:aaba' prefix='64'>
+  </ip>
+</network>
+```
+
+在 `/etc/sysctl.conf` 中添加：
+
+```
+net.ipv6.conf.all.proxy_ndp = 1
+```
+
 ### 配置文件
 
 配置文件路径为 `/etc/hustoa-vm/config.toml`，该文件示例如下：
