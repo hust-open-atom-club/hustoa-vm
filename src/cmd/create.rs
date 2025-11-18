@@ -9,6 +9,7 @@ use serde_yaml;
 use std::{fs, vec};
 use crate::config::HustoaVmConfig;
 use crate::tools;
+use crate::distro_info;
 use crate::v6pool::V6Pool;
 
 #[derive(Args)]
@@ -45,12 +46,10 @@ pub struct SubCmdCreate {
 #[derive(Debug)]
 struct NewVmInfo {
     vm_name: String,
-    user_name: String,
     host_name: String,
-    distro: String,
-    distro_version: String,
-    ssh_pubkey: String,
+    download_link: String,
     virt_inst_osinfo: String,
+    userdata_conf: String,
     interface: String,
     disk_path: PathBuf,
     seed_path: PathBuf,
@@ -75,21 +74,22 @@ impl NewVmInfo {
         let user_name = args.name.clone();
         let host_name = format!("{}-{}-{}", name_strip_space, args.distro, rand_postfix);
 
-        let distro = args.distro.clone();
-        let distro_version = args.distro_version.clone().unwrap_or_else(|| {
-            match distro.as_str() {
-                "ubuntu" => "noble".to_string(),
-                "debian" => "bookworm".to_string(),
-                "archlinux" => "".to_string(),
-                _ => {
-                    error!("Unsupport distribution");
-                    "".to_string()
-                }
-            }
-        });
-        let virt_inst_osinfo = get_virt_inst_osinfo(&distro, &distro_version);
-
         let ssh_pubkey = fs::read_to_string(&args.ssh_pubkey)?;
+
+        let distro = args.distro.clone();
+        let distro_info = distro_info::get_distro(&distro)?;
+        let distro_version = match &args.distro_version {
+            Some(version) => {
+                distro_info.check_version(version)?
+            },
+            None => {
+                distro_info.latest_version()
+            }
+        };
+        info!("Selecting distro: {}, version: {}", distro, distro_version);
+        let download_link = distro_info.get_download_link(&distro_version)?;
+        let virt_inst_osinfo = distro_info.get_osinfo_conf(&distro_version)?;
+        let userdata_conf = distro_info.gen_cloud_user_data(&distro_version, &user_name, &ssh_pubkey)?;
 
         let disk_name = format!("{}.img", vm_name);
         let disk_path = config.common.libvirt_storage.join(disk_name);
@@ -115,12 +115,10 @@ impl NewVmInfo {
 
         Ok(NewVmInfo {
             vm_name,
-            user_name,
             host_name,
-            distro,
-            distro_version,
-            ssh_pubkey,
+            download_link,
             virt_inst_osinfo,
+            userdata_conf,
             interface,
             disk_path,
             seed_path,
@@ -138,17 +136,12 @@ impl NewVmInfo {
     }
 
     fn prepare_disk(&self, args: &SubCmdCreate) -> Result<(), Box<dyn Error>> {
-        let link = match get_download_link(&args.distro, &self.distro_version.clone()) {
-            Some(link_str) => link_str,
-            None => return Err("Download error".into())
-        };
-
-        info!("Downloading disk file {}", link);
+        info!("Downloading disk file {}", self.download_link);
         let wget_res = Command::new("wget")
             .args([
                 "-O",
                 self.disk_path.to_str().unwrap(),
-                &link
+                &self.download_link
             ])
             .status()?;
         if wget_res.success() {
@@ -180,7 +173,7 @@ impl NewVmInfo {
         let metadata_config = tmp_dir.join(format!("metadata-{}.yaml", self.vm_name));
         let network_config = tmp_dir.join(format!("network-{}.yaml", self.vm_name));
 
-        fs::write(&userdata_config, gen_user_data_config(self))?;
+        fs::write(&userdata_config, &self.userdata_conf)?;
         fs::write(&metadata_config, gen_meta_data_config(self))?;
         fs::write(&network_config, gen_network_config(self))?;
 
@@ -261,151 +254,6 @@ impl NewVmInfo {
 
         Ok(())
     }
-}
-
-fn get_arch_codename() -> Option<String> {
-    match std::env::consts::ARCH {
-        "x86_64" => Some("amd64".to_string()),
-        "aarch64" => Some("arm64".to_string()),
-        _ => None
-    }
-}
-
-fn get_virt_inst_osinfo(distro: &String, distro_version: &String) -> String {
-    match distro.as_str() {
-        "ubuntu" => "ubuntu-stable-latest".to_string(),
-        "debian" => format!("debian{}", distro_version),
-        _ => "linux2022".to_string()
-    }
-}
-
-fn get_download_link_ubuntu(version: &String) -> Option<String> {
-    Some(String::from(format!(
-        "https://mirrors.ustc.edu.cn/ubuntu-cloud-images/{0}/current/{0}-server-cloudimg-{1}.img",
-        version, get_arch_codename()?)))
-    }
-
-fn get_download_link_debian(_version: &String) -> Option<String> {
-    todo!("fix the link");
-    // return Some(String::from(format!(
-    //     "https://mirrors.ustc.edu.cn/debian-cdimage/cloud/{0}/latest/debian-12-generic-{1}.qcow2",
-    //     version, get_arch_codename()?)));
-}
-
-fn get_download_link_archlinux(_version: &String) -> Option<String> {
-    None
-}
-
-fn get_download_link(distro: &String, version: &String) -> Option<String> {
-    match distro.as_str() {
-        "ubuntu" => get_download_link_ubuntu(version),
-        "debian" => get_download_link_debian(version),
-        "archlinux" => get_download_link_archlinux(version),
-        _ => None
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct UserDataConfig {
-    system_info: SystemInfo,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    apt: Option<APTConfig>,
-}
-
-#[derive(Debug, Serialize)]
-struct SystemInfo {
-    default_user: DefaultUser
-}
-
-#[derive(Debug, Serialize)]
-struct DefaultUser {
-    name: String,
-    ssh_authorized_keys: Vec<String>,
-    sudo: String,
-    shell: String
-}
-
-#[derive(Debug, Serialize)]
-struct APTConfig {
-    primary: Vec<SourceConfig>,
-    security: Vec<SourceConfig>,
-}
-
-#[derive(Debug, Serialize)]
-struct SourceConfig {
-    arches: Vec<String>,
-    uri: String,
-}
-
-fn gen_package_manager_config_ubuntu(_vminfo: &NewVmInfo) -> Option<APTConfig> {
-    match std::env::consts::ARCH {
-        "x86_64" => {
-            Some(APTConfig {
-                primary: vec![SourceConfig {
-                    arches: vec!["default".to_string()],
-                    uri: "http://mirrors.hust.edu.cn/ubuntu".to_string(),
-                }],
-                security: vec![SourceConfig {
-                    arches: vec!["default".to_string()],
-                    uri: "http://security.ubuntu.com/ubuntu".to_string(),
-                }],
-            })
-        },
-        "aarch64" => {
-            Some(APTConfig {
-                primary: vec![SourceConfig {
-                    arches: vec!["default".to_string()],
-                    uri: "http://mirrors.ustc.edu.cn/ubuntu-ports".to_string(),
-                }],
-                security: vec![SourceConfig {
-                    arches: vec!["default".to_string()],
-                    uri: "http://ports.ubuntu.com/ubuntu-ports".to_string(),
-                }],
-            })
-        },
-        _ => None
-    }
-}
-
-fn gen_package_manager_config_debian(_vminfo: &NewVmInfo) -> Option<APTConfig> {
-    Some(APTConfig {
-        primary: vec![SourceConfig {
-            arches: vec!["default".to_string()],
-            uri: "http://mirrors.hust.edu.cn/debian".to_string(),
-        }],
-        security: vec![SourceConfig {
-            arches: vec!["default".to_string()],
-            uri: "https://security.debian.org/debian-security".to_string(),
-        }],
-    })
-}
-
-fn gen_package_manager_config(vminfo: &NewVmInfo) -> Option<APTConfig> {
-    match vminfo.distro.as_str() {
-        "ubuntu" => gen_package_manager_config_ubuntu(vminfo),
-        "debian" => gen_package_manager_config_debian(vminfo),
-        _ => None
-    }
-}
-
-fn gen_user_data_config(vminfo: &NewVmInfo) -> String {
-    let apt = gen_package_manager_config(vminfo);
-
-    let config = UserDataConfig {
-        system_info: SystemInfo {
-            default_user: DefaultUser {
-                name: vminfo.user_name.clone(),
-                ssh_authorized_keys: vec![vminfo.ssh_pubkey.clone()],
-                sudo: "ALL=(ALL) NOPASSWD:ALL".to_string(),
-                shell: "/bin/bash".to_string()
-            }
-        },
-        apt
-    };
-
-    let res = serde_yaml::to_string(&config).expect("cannot generate user config");
-    "#cloud-config\n".to_string() + &res
 }
 
 #[derive(Debug, Serialize)]

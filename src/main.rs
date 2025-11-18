@@ -2,6 +2,7 @@ mod cmd;
 mod config;
 mod tools;
 mod v6pool;
+mod distro_info;
 
 use clap::{Parser, Subcommand};
 use cmd::create::SubCmdCreate;
