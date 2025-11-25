@@ -7,7 +7,6 @@ mod distro_info;
 use clap::{Parser, Subcommand};
 use cmd::create::SubCmdCreate;
 use cmd::v6pool::SubCmdV6Pool;
-use cmd::save_all::SubCmdSaveAll;
 use env_logger;
 use std::env;
 use std::error::Error;
@@ -29,9 +28,6 @@ enum Commands {
 
     /// Flush the ipv6 ndp proxy configuration
     V6Pool(SubCmdV6Pool),
-
-    /// Save all the libvirt machines 
-    SaveAll(SubCmdSaveAll),
 }
 
 fn init_env_logger() {
@@ -57,9 +53,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(Commands::V6Pool(args)) => {
             cmd::v6pool::run_cmd(args, config)?;
         },
-        Some(Commands::SaveAll(args)) => {
-            cmd::save_all::run_cmd(args, config)?;
-        }
         None => {
             error!("Unsupported command.");
             return Err("Unsupported command".into())
