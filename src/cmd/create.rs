@@ -1,3 +1,4 @@
+use std::fs::remove_file;
 use std::io::Write;
 use std::net::Ipv6Addr;
 use std::{error::Error, path::PathBuf};
@@ -346,17 +347,14 @@ fn gen_network_config(vminfo: &NewVmInfo) -> String {
     "#cloud-config\n".to_string() + &res
 }
 
-pub fn run_cmd(args: &SubCmdCreate, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
-    let vminfo = NewVmInfo::gen_new_vm_info(args, &config)?;
-    debug!("get vm info: {:?}", vminfo);
+fn do_create(vminfo: &NewVmInfo, args: &SubCmdCreate, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
     info!("Creating machine {}", vminfo.vm_name);
-
     vminfo.add_ndp_proxy(&config)?;
 
     info!("Preparing disk");
     vminfo.prepare_disk(args)?;
 
-    debug!("Preparing cloud init files");
+    info!("Preparing cloud init files");
     vminfo.prepare_cloud_init_files()?;
 
     info!("Perform vm installation");
@@ -367,4 +365,19 @@ pub fn run_cmd(args: &SubCmdCreate, config: HustoaVmConfig) -> Result<(), Box<dy
         info!("Ipv6 address: {}", ipv6info.v6_addr);
     }
     Ok(())
+}
+
+pub fn run_cmd(args: &SubCmdCreate, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+    let vminfo = NewVmInfo::gen_new_vm_info(args, &config)?;
+    debug!("get vm info: {:?}", vminfo);
+
+    match do_create(&vminfo, args, config) {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            remove_file(vminfo.disk_path).ok();
+            remove_file(vminfo.seed_path).ok();
+            error!("Error when creating vm");
+            Err(err)
+        }
+    }
 }
