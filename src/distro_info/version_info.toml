@@ -1,0 +1,33 @@
+[[distro]]
+name = "ubuntu"
+latest_version = "noble"
+
+[[distro.versions]]
+name = "noble"
+alias = ["24.04"]
+osinfo_conf = "ubuntu-stable-latest"
+
+[[distro.versions]]
+name = "jammy"
+alias = ["22.04"]
+osinfo_conf = "ubuntujammy"
+
+[[distro.versions]]
+name = "focal"
+alias = ["20.04"]
+osinfo_conf = "ubuntufocal"
+
+[[distro.versions]]
+name = "bionic"
+alias = ["18.04"]
+osinfo_conf = "ubuntubionic"
+
+[[distro]]
+name = "debian"
+latest_version = "bookworm"
+
+[[distro.versions]]
+name = "bookworm"
+alias = ["12"]
+# debian12 is not listed in virt-install --osinfo
+osinfo_conf = "debian11"
