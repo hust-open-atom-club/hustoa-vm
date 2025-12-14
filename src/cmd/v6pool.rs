@@ -1,6 +1,6 @@
 use std::{error::Error, net::Ipv6Addr};
 use clap::{Args, Subcommand};
-use crate::config::HustoaVmConfig;
+use crate::{config::HustoaVmConfig, tools::{gen_mac_address_qemu, generate_eui64_from_mac}};
 use log::error;
 use crate::v6pool::V6Pool;
 
@@ -22,11 +22,13 @@ enum Commands {
 
     /// Delete ipv6 address
     Delete(CmdDelete),
+
+    /// Generate libvirt network define xml for ipv6
+    GenV6NetXML(CmdGenerateNetDefine),
 }
 
 #[derive(Args)]
-struct CmdFlush {
-}
+struct CmdFlush;
 
 #[derive(Args)]
 struct CmdAdd {
@@ -37,6 +39,19 @@ struct CmdAdd {
 struct CmdDelete {
     addr: Ipv6Addr
 }
+
+#[derive(Args)]
+struct CmdGenerateNetDefine {
+    #[arg(short, long, default_value_t = { "hustoa-netv6".to_string() })]
+    /// Set libvirt network name
+    name: String,
+
+    #[arg(short, long, default_value_t = { "virbr6".to_string() })]
+    /// Set bridge network interface name
+    iface: String,
+
+}
+
 
 fn run_cmd_flush(_args: &CmdFlush, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
     let pool = V6Pool::get_pool()?;
@@ -51,9 +66,38 @@ fn run_cmd_add(args: &CmdAdd, config: HustoaVmConfig) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-fn run_cmd_delete(args: &CmdDelete, _config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+fn run_cmd_delete(args: &CmdDelete, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+    let _ = config;
     let mut pool = V6Pool::get_pool()?;
     pool.remove(args.addr)?;
+    Ok(())
+}
+
+fn run_cmd_genv6netxml(args: &CmdGenerateNetDefine, config: HustoaVmConfig)
+    -> Result<(), Box<dyn Error>> {
+
+    let mac = gen_mac_address_qemu();
+    let ipv6conf = match config.ipv6conf {
+        Some(ipv6conf) => ipv6conf,
+        None => return Err("no ipv6 config provided".into()),
+    };
+    let ipv6_addr = generate_eui64_from_mac(&mac, ipv6conf.ipv6_prefix)?;
+
+    let xml = format!("<network>
+  <name>{name_}</name>
+  <forward mode='open'/>
+  <bridge name='{iface_}' stp='on' delay='0'/>
+  <mac address='{mac_}'/>
+  <domain name='{name_}' localOnly='yes'/>
+  <ip family='ipv6' address='{v6addr_}' prefix='64'>
+  </ip>
+</network>",
+    name_ = args.name,
+    iface_ = args.iface,
+    mac_ = mac,
+    v6addr_ = ipv6_addr);
+
+    println!("{}", xml);
     Ok(())
 }
 
@@ -62,6 +106,7 @@ pub fn run_cmd(args: &SubCmdV6Pool, config: HustoaVmConfig) -> Result<(), Box<dy
         Some(Commands::Flush(subargs)) => run_cmd_flush(subargs, config)?,
         Some(Commands::Add(subargs)) => run_cmd_add(subargs, config)?,
         Some(Commands::Delete(subargs)) => run_cmd_delete(subargs, config)?,
+        Some(Commands::GenV6NetXML(subargs)) => run_cmd_genv6netxml(subargs, config)?,
         None => {
             error!("Unsupported command.");
             return Err("Unsupported command".into())
