@@ -25,7 +25,7 @@ pub struct SubCmdCreate {
     #[arg(long)]
     ssh_pubkey: PathBuf,
 
-    /// Distribution name, supported: ubuntu
+    /// Distribution name, see `hustoa-vm distro`
     #[arg(short, long)]
     distro: String,
 
@@ -33,15 +33,15 @@ pub struct SubCmdCreate {
     #[arg(long)]
     distro_version: Option<String>,
 
-    /// Disk size, in GB, default to 60
+    /// Disk size, in GB
     #[arg(long, default_value_t = 60)]
     disk_size: u64,
 
-    /// Memory size, in GB, default to 16
+    /// Memory size, in GB
     #[arg(short, long, default_value_t = 16)]
     memory: u64,
 
-    /// Number of vcpus, default to 16
+    /// Number of vcpus
     #[arg(long, default_value_t = 16)]
     vcpus: usize
 }

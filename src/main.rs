@@ -6,6 +6,7 @@ mod distro_info;
 
 use clap::{Parser, Subcommand};
 use cmd::create::SubCmdCreate;
+use cmd::distro::SubCmdDistro;
 use cmd::v6pool::SubCmdV6Pool;
 use env_logger;
 use std::env;
@@ -28,6 +29,9 @@ enum Commands {
 
     /// Flush the ipv6 ndp proxy configuration
     V6Pool(SubCmdV6Pool),
+
+    /// List the supported distributions
+    Distro(SubCmdDistro)
 }
 
 fn init_env_logger() {
@@ -47,12 +51,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = HustoaVmConfig::get_global_config()?;
 
     match &cli.command {
-        Some(Commands::Create(args)) => {
-            cmd::create::run_cmd(args, config)?;
-        },
-        Some(Commands::V6Pool(args)) => {
-            cmd::v6pool::run_cmd(args, config)?;
-        },
+        Some(Commands::Create(args)) => cmd::create::run_cmd(args, config)?,
+        Some(Commands::V6Pool(args)) => cmd::v6pool::run_cmd(args, config)?,
+        Some(Commands::Distro(args)) => cmd::distro::run_cmd(args, config)?,
         None => {
             error!("Unsupported command.");
             return Err("Unsupported command".into())
