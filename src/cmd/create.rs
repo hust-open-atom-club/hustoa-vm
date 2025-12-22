@@ -21,6 +21,10 @@ pub struct SubCmdCreate {
     #[arg(short, long)]
     name: String,
 
+    /// Default user name, default to the vm's name
+    #[arg(short, long)]
+    user: Option<String>,
+
     /// Path of the ssh pubkey file
     #[arg(long)]
     ssh_pubkey: PathBuf,
@@ -74,7 +78,11 @@ impl NewVmInfo {
         let name_strip_space = filenamify(&args.name).replace(" ", "_");
 
         let vm_name = format!("hustoa-vm-{}-{}-{}", name_strip_space, args.distro, rand_postfix);
-        let user_name = args.name.clone();
+        let user_name = match &args.user {
+            Some(user) => user.clone(),
+            None => args.name.clone()
+        };
+
         let host_name = format!("{}-{}-{}", name_strip_space, args.distro, rand_postfix);
 
         let ssh_pubkey = fs::read_to_string(&args.ssh_pubkey)?;
