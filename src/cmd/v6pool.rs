@@ -17,6 +17,9 @@ enum Commands {
     /// Reload the ipv6 configuration
     Flush(CmdFlush),
 
+    /// Clean the unused ipv6 pool entry
+    Purge(CmdPurge),
+
     /// Add a new ipv6 address to the manager
     Add(CmdAdd),
 
@@ -41,6 +44,9 @@ struct CmdAdd {
     /// Domain name, will be used to delete unused entry
     domain: String,
 }
+
+#[derive(Args)]
+struct CmdPurge;
 
 #[derive(Args)]
 struct CmdDelete {
@@ -71,6 +77,12 @@ fn run_cmd_flush(_args: &CmdFlush, config: HustoaVmConfig) -> Result<(), Box<dyn
     let pool = V6Pool::get_pool()?;
     pool.flush(&config)?;
     Ok(())
+}
+
+fn run_cmd_purge(_args: &CmdPurge, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+    let mut pool = V6Pool::get_pool()?;
+
+    pool.purge(&config)
 }
 
 fn run_cmd_add(args: &CmdAdd, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
@@ -125,6 +137,7 @@ fn run_cmd_genv6netxml(args: &CmdGenerateNetDefine, config: HustoaVmConfig)
 pub fn run_cmd(args: &SubCmdV6Pool, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
     match &args.command {
         Some(Commands::Flush(subargs)) => run_cmd_flush(subargs, config)?,
+        Some(Commands::Purge(subargs)) => run_cmd_purge(subargs, config)?,
         Some(Commands::Add(subargs)) => run_cmd_add(subargs, config)?,
         Some(Commands::Delete(subargs)) => run_cmd_delete(subargs, config)?,
         Some(Commands::DeleteByName(subargs)) => run_cmd_delete_by_name(subargs, config)?,
