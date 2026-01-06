@@ -1,9 +1,29 @@
-use std::net::Ipv6Addr;
+use std::{ffi::OsStr, fmt::{Debug, Display}, net::Ipv6Addr};
 use rand::{self, Rng};
 use std::error::Error;
 use semver::Version;
 use std::process::Command;
-use log::error;
+use log::{debug, error, info};
+
+pub fn hustoa_run_cmd<I, S>(program: S, args: I, dryrun: bool)
+    -> Command
+    where I: IntoIterator<Item = S> + Debug,
+    S: AsRef<OsStr> + Display, {
+
+    if let Err(_) = which::which(&program) {
+        error!("Cannot find {} in PATH", program);
+    }
+    let mut cmd;
+    if dryrun {
+        info!("dryrun command {}, args: {:?}", program, args);
+        cmd = Command::new("echo");
+    } else {
+        debug!("running command {}, args: {:?}", program, args);
+        cmd = Command::new(program);
+        cmd.args(args);
+    }
+    return cmd;
+}
 
 pub fn gen_mac_address_qemu() -> String {
     let mut rng = rand::thread_rng();
@@ -57,9 +77,7 @@ pub fn gen_rand_postfix() -> String {
 }
 
 pub fn virt_install_has_osinfo() -> bool {
-    let res = Command::new("virt-install")
-        .arg("--version")
-        .output();
+    let res = hustoa_run_cmd("virt-install", ["--version"], false).output();
     match res {
         Ok(output) => {
             let version_now = String::from_utf8(output.stdout).unwrap();

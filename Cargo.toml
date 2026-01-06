@@ -18,3 +18,4 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_yaml = "0.9.34"
 tempfile = "3.12.0"
 toml = "0.8.13"
+which = "6.0.3"

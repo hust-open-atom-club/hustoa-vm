@@ -5,13 +5,12 @@ use std::{error::Error, path::PathBuf};
 use clap::Args;
 use log::{debug, info, error};
 use tempfile::NamedTempFile;
-use std::process::Command;
 use filenamify::filenamify;
 use serde::Serialize;
 use serde_yaml;
 use std::{fs, vec};
 use crate::config::HustoaVmConfig;
-use crate::tools;
+use crate::tools::{self, hustoa_run_cmd};
 use crate::distro_info;
 use crate::v6pool::V6Pool;
 
@@ -47,7 +46,10 @@ pub struct SubCmdCreate {
 
     /// Number of vcpus
     #[arg(long, default_value_t = 16)]
-    vcpus: usize
+    vcpus: usize,
+
+    #[arg(long, default_value_t = false)]
+    dryrun: bool,
 }
 
 #[derive(Debug)]
@@ -148,13 +150,11 @@ impl NewVmInfo {
 
     fn prepare_disk(&self, args: &SubCmdCreate) -> Result<(), Box<dyn Error>> {
         info!("Downloading disk file {}", self.download_link);
-        let wget_res = Command::new("wget")
-            .args([
+        let wget_res = hustoa_run_cmd("wget", [
                 "-O",
                 self.disk_path.to_str().unwrap(),
                 &self.download_link
-            ])
-            .status()?;
+            ], args.dryrun).status()?;
         if wget_res.success() {
             info!("Download complete");
         } else {
@@ -162,13 +162,11 @@ impl NewVmInfo {
             return Err("wget error".into());
         }
 
-        let qemu_img_res = Command::new("qemu-img")
-            .args([
+        let qemu_img_res = hustoa_run_cmd("qemu-img", [
                 "resize",
                 self.disk_path.to_str().unwrap(),
                 &format!("{}G", args.disk_size)
-            ])
-            .status()?;
+            ], args.dryrun).status()?;
 
         if !qemu_img_res.success() {
             error!("Resize image failed");
@@ -178,7 +176,7 @@ impl NewVmInfo {
         Ok(())
     }
 
-    fn prepare_cloud_init_files(&self) -> Result<(), Box<dyn Error>> {
+    fn prepare_cloud_init_files(&self, args: &SubCmdCreate) -> Result<(), Box<dyn Error>> {
         let mut userdata_config = NamedTempFile::new()?;
         let mut metadata_config = NamedTempFile::new()?;
         let mut network_config = NamedTempFile::new()?;
@@ -187,8 +185,7 @@ impl NewVmInfo {
         metadata_config.write(gen_meta_data_config(self).as_bytes())?;
         network_config.write(gen_network_config(self).as_bytes())?;
 
-        let cloud_localds_res = Command::new("cloud-localds")
-            .args([
+        let cloud_localds_res = hustoa_run_cmd("cloud-localds", [
                 "-N",
                 network_config.path().to_str().unwrap(),
                 "-d",
@@ -196,7 +193,7 @@ impl NewVmInfo {
                 self.seed_path.to_str().unwrap(),
                 userdata_config.path().to_str().unwrap(),
                 metadata_config.path().to_str().unwrap(),
-            ]).status()?;
+            ], args.dryrun).status()?;
 
         if !cloud_localds_res.success() {
             error!("Generate seed image failed");
@@ -247,16 +244,16 @@ impl NewVmInfo {
         }
 
         debug!("virt-install params: {:?}", params);
-        let install_res = Command::new("virt-install")
-            .args(params)
-            .status()?;
+        let install_res = hustoa_run_cmd("virt-install", params, args.dryrun).status()?;
 
         if !install_res.success() {
             error!("Installation failed");
             return Err("virt-install error".into());
         }
 
-        std::fs::remove_file(&self.seed_path)?;
+        if !args.dryrun {
+            std::fs::remove_file(&self.seed_path)?;
+        }
 
         Ok(())
     }
@@ -363,7 +360,7 @@ fn do_create(vminfo: &NewVmInfo, args: &SubCmdCreate, config: HustoaVmConfig) ->
     vminfo.prepare_disk(args)?;
 
     info!("Preparing cloud init files");
-    vminfo.prepare_cloud_init_files()?;
+    vminfo.prepare_cloud_init_files(args)?;
 
     info!("Perform vm installation");
     vminfo.install(args)?;
