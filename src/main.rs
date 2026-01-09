@@ -9,6 +9,8 @@ use cmd::create::SubCmdCreate;
 use cmd::distro::SubCmdDistro;
 use cmd::save_all::SubCmdSaveAll;
 use cmd::v6pool::SubCmdV6Pool;
+use cmd::MainCommandsRun;
+use enum_dispatch::enum_dispatch;
 use env_logger;
 use std::env;
 use std::error::Error;
@@ -20,11 +22,12 @@ use config::HustoaVmConfig;
 #[command(propagate_version = true)]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Option<MainCommands>,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+#[enum_dispatch]
+enum MainCommands {
     /// Create a virtual machine
     Create(SubCmdCreate),
 
@@ -54,16 +57,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let config = HustoaVmConfig::get_global_config()?;
 
-    match &cli.command {
-        Some(Commands::Create(args)) => cmd::create::run_cmd(args, config)?,
-        Some(Commands::V6Pool(args)) => cmd::v6pool::run_cmd(args, config)?,
-        Some(Commands::Distro(args)) => cmd::distro::run_cmd(args, config)?,
-        Some(Commands::SaveAll(args)) => cmd::save_all::run_cmd(args, config)?,
+    match cli.command {
+        Some(args) => args.run_cmd(&config)?,
         None => {
             error!("Unsupported command.");
-            return Err("Unsupported command".into())
+            return Err("argument parser failed".into())
         }
     }
-
     Ok(())
 }

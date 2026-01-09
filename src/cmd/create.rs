@@ -14,6 +14,8 @@ use crate::tools::{self, hustoa_run_cmd};
 use crate::distro_info;
 use crate::v6pool::V6Pool;
 
+use super::MainCommandsRun;
+
 #[derive(Args)]
 pub struct SubCmdCreate {
     /// Name of the virtual machine
@@ -352,37 +354,41 @@ fn gen_network_config(vminfo: &NewVmInfo) -> String {
     "#cloud-config\n".to_string() + &res
 }
 
-fn do_create(vminfo: &NewVmInfo, args: &SubCmdCreate, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
-    info!("Creating machine {}", vminfo.vm_name);
-    vminfo.add_ndp_proxy(&config)?;
+impl SubCmdCreate {
+    fn do_create(&self, vminfo: &NewVmInfo, config: &HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+        info!("Creating machine {}", vminfo.vm_name);
+        vminfo.add_ndp_proxy(&config)?;
 
-    info!("Preparing disk");
-    vminfo.prepare_disk(args)?;
+        info!("Preparing disk");
+        vminfo.prepare_disk(self)?;
 
-    info!("Preparing cloud init files");
-    vminfo.prepare_cloud_init_files(args)?;
+        info!("Preparing cloud init files");
+        vminfo.prepare_cloud_init_files(self)?;
 
-    info!("Perform vm installation");
-    vminfo.install(args)?;
+        info!("Perform vm installation");
+        vminfo.install(self)?;
 
-    info!("Installation complete");
-    if let Some(ipv6info) = &vminfo.ipv6info {
-        info!("Ipv6 address: {}", ipv6info.v6_addr);
+        info!("Installation complete");
+        if let Some(ipv6info) = &vminfo.ipv6info {
+            info!("Ipv6 address: {}", ipv6info.v6_addr);
+        }
+        Ok(())
     }
-    Ok(())
 }
 
-pub fn run_cmd(args: &SubCmdCreate, config: HustoaVmConfig) -> Result<(), Box<dyn Error>> {
-    let vminfo = NewVmInfo::gen_new_vm_info(args, &config)?;
-    debug!("get vm info: {:?}", vminfo);
+impl MainCommandsRun for SubCmdCreate {
+    fn run_cmd(&self, config: &HustoaVmConfig) -> Result<(), Box<dyn Error>> {
+        let vminfo = NewVmInfo::gen_new_vm_info(self, &config)?;
+        debug!("get vm info: {:?}", vminfo);
 
-    match do_create(&vminfo, args, config) {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            remove_file(vminfo.disk_path).ok();
-            remove_file(vminfo.seed_path).ok();
-            error!("Error when creating vm");
-            Err(err)
+        match self.do_create(&vminfo, config) {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                remove_file(vminfo.disk_path).ok();
+                remove_file(vminfo.seed_path).ok();
+                error!("Error when creating vm");
+                Err(err)
+            }
         }
     }
 }
