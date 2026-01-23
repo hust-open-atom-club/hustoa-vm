@@ -5,7 +5,7 @@ use std::{error::Error, path::PathBuf};
 use clap::Args;
 use log::{debug, info, error};
 use tempfile::NamedTempFile;
-use filenamify::filenamify;
+use slugify::slugify;
 use serde::Serialize;
 use serde_yaml;
 use std::{fs, vec};
@@ -91,12 +91,12 @@ struct Ipv6Info {
 impl NewVmInfo {
     fn gen_new_vm_info(args: &SubCmdCreate, config: &HustoaVmConfig) -> Result<NewVmInfo, Box<dyn Error>> {
         let rand_postfix = tools::gen_rand_postfix();
-        let name_strip_space = filenamify(&args.name).replace(" ", "_");
+        let name_strip_space = slugify!(&args.name).replace("-", "_");
 
         let vm_name = format!("hustoa-vm-{}-{}-{}", name_strip_space, args.distro, rand_postfix);
         let user_name = match &args.user {
-            Some(user) => user.clone(),
-            None => args.name.clone()
+            Some(user) => slugify!(&user).replace("-", "_"),
+            None => name_strip_space.clone(),
         };
 
         let host_name = format!("{}-{}-{}", name_strip_space, args.distro, rand_postfix);
