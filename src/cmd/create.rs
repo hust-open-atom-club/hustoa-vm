@@ -369,7 +369,9 @@ fn gen_network_config(vminfo: &NewVmInfo) -> String {
 impl SubCmdCreate {
     fn do_create(&self, vminfo: &NewVmInfo, config: &HustoaVmConfig) -> Result<(), Box<dyn Error>> {
         info!("Creating machine {}", vminfo.vm_name);
-        vminfo.add_ndp_proxy(&config)?;
+        if ! self.dryrun {
+            vminfo.add_ndp_proxy(&config)?;
+        }
 
         info!("Preparing disk");
         vminfo.prepare_disk(self)?;
