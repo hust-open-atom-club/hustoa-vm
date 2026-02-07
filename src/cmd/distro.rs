@@ -22,6 +22,7 @@ impl MainCommandsRun for SubCmdDistro {
                 }
                 println!()
             }
+            println!()
         }
         Ok(())
     }

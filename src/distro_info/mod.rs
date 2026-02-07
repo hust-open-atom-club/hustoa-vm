@@ -1,7 +1,9 @@
 mod ubuntu;
 mod debian;
+mod archlinux;
 
 use std::error::Error;
+use archlinux::ArchlinuxInfo;
 use debian::DebianInfo;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -48,6 +50,15 @@ struct UserDataConfig {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     apt: Option<APTConfig>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runcmd: Option<Vec<String>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cloud_config_modules: Option<Vec<String>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cloud_final_modules: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -89,6 +100,7 @@ pub fn get_distro(name: &str) -> Result<Box<dyn Distro>, Box<dyn Error>> {
     match name {
         "ubuntu" => Ok(Box::new(UbuntuInfo::new(info.unwrap()))),
         "debian" => Ok(Box::new(DebianInfo::new(info.unwrap()))),
+        "archlinux" => Ok(Box::new(ArchlinuxInfo::new())),
         _ => return Err("Unsupported distro".into())
     }
 }
