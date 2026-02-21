@@ -9,7 +9,7 @@ use slugify::slugify;
 use serde::Serialize;
 use serde_yaml;
 use std::{fs, vec};
-use crate::config::{global_config, HustoaVmConfig};
+use crate::config::{default_disk_size, default_memory_size, default_vcpus, global_config, HustoaVmConfig};
 use crate::tools::{self, hustoa_run_cmd};
 use crate::distro_info::{self, Distro};
 use crate::v6pool::V6Pool;
@@ -55,15 +55,27 @@ pub struct SubCmdCreate {
 }
 
 fn default_disk_size_arg() -> usize {
-    global_config.common.default_disk_size
+    let config_res: &Result<HustoaVmConfig, Box<dyn Error + Send + Sync>> = &global_config;
+    match config_res {
+        Ok(config) => config.common.default_disk_size,
+        Err(_) => default_disk_size(),
+    }
 }
 
 fn default_memory_size_arg() -> usize {
-    global_config.common.default_memory_size
+    let config_res: &Result<HustoaVmConfig, Box<dyn Error + Send + Sync>> = &global_config;
+    match config_res {
+        Ok(config) => config.common.default_memory_size,
+        Err(_) => default_memory_size(),
+    }
 }
 
 fn default_vcpus_arg() -> usize {
-    global_config.common.default_vcpus
+    let config_res: &Result<HustoaVmConfig, Box<dyn Error + Send + Sync>> = &global_config;
+    match config_res {
+        Ok(config) => config.common.default_vcpus,
+        Err(_) => default_vcpus(),
+    }
 }
 
 struct NewVmInfo {
