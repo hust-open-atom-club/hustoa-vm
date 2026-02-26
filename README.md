@@ -32,6 +32,8 @@ cp ./target/release/hustoa-vm /usr/local/bin/hustoa-vm
 
 ## 使用方法
 
+详细的命令行使用方法请参见 `hustoa-vm help` 及其中 subcommand 的帮助文档
+
 ### 设置网络环境
 
 如果需要使用 ipv6，需要在 libvirt 中添加一个仅 v6 的网络。该网络的 xml 配置可用以下命令生成：
@@ -135,6 +137,20 @@ hustoa-vm v6-pool flush
 ```
 
 对于使用 NetworkManager 管理网络的宿主机，可以将以上内容保存在 `/etc/NetworkManager/dispatcher.d` 中
+
+### 保存/恢复虚拟机状态
+
+为了便于 host 机器重启维护，可以在重启前执行以下命令，该命令将保存**所有** libvirt 管理的虚拟机
+
+```bash
+hustoa-vm save-all
+```
+
+重启完毕后，可执行以下命令恢复：
+
+```bash
+hustoa-vm restore-all
+```
 
 ## 开发/测试状态
 
