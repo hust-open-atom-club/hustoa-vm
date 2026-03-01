@@ -26,21 +26,24 @@ pub struct V6PoolItem {
 
 impl V6Pool {
     pub fn get_pool() -> Result<V6Pool, Box <dyn Error>> {
-        let file_path = PathBuf::from(V6POOL_PATH);
-        if !file_path.is_file() {
-            File::create(file_path)?;
-            return Ok(V6Pool {
-                pool: Vec::new()
-            })
-        }
-        let v6pool_str = fs::read_to_string(V6POOL_PATH)?;
-        if v6pool_str.len() == 0 {
-            return Ok(V6Pool {
-                pool: Vec::new()
-            })
-        }
-        let mut ret: V6Pool = toml::from_str(&v6pool_str)?;
+        let mut ret: V6Pool;
 
+        let file_path = PathBuf::from(V6POOL_PATH);
+        if file_path.is_file() {
+            let v6pool_str = fs::read_to_string(V6POOL_PATH)?;
+            if v6pool_str.len() == 0 {
+                ret = V6Pool {
+                    pool: Vec::new()
+                }
+            } else {
+                ret = toml::from_str(&v6pool_str)?;
+            }
+        } else {
+            File::create(file_path)?;
+            ret = V6Pool {
+                pool: Vec::new()
+            }
+        }
         ret.migrate_deprecated_file();
 
         Ok(ret)
