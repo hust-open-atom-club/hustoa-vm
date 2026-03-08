@@ -28,7 +28,7 @@ impl<'a> Distro for UbuntuInfo<'a> {
         };
 
         Ok(String::from(format!(
-            "https://mirrors.ustc.edu.cn/ubuntu-cloud-images/{0}/current/{0}-server-cloudimg-{1}.img",
+            "https://cloud-images.ubuntu.com/{0}/current/{0}-server-cloudimg-{1}.img",
             item.name, arch)))
     }
 
@@ -75,7 +75,7 @@ impl<'a> UbuntuInfo<'a> {
                     }],
                     security: vec![SourceConfig {
                         arches: vec!["default".to_string()],
-                        uri: "http://security.ubuntu.com/ubuntu".to_string(),
+                        uri: "http://mirrors.hust.edu.cn/ubuntu".to_string(),
                     }],
                 })
             },
@@ -83,11 +83,11 @@ impl<'a> UbuntuInfo<'a> {
                 Some(APTConfig {
                     primary: vec![SourceConfig {
                         arches: vec!["default".to_string()],
-                        uri: "http://mirrors.ustc.edu.cn/ubuntu-ports".to_string(),
+                        uri: "http://mirrors.hust.edu.cn/ubuntu-ports".to_string(),
                     }],
                     security: vec![SourceConfig {
                         arches: vec!["default".to_string()],
-                        uri: "http://ports.ubuntu.com/ubuntu-ports".to_string(),
+                        uri: "http://mirrors.hust.edu.cn/ubuntu-ports".to_string(),
                     }],
                 })
             },
