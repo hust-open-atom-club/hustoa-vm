@@ -44,7 +44,7 @@ impl Distro for ArchlinuxInfo {
             cloud_config_modules: Some(vec!["runcmd".to_string()]),
             cloud_final_modules: Some(vec!["scripts-user".to_string()]),
         };
-        let res = serde_yaml::to_string(&config).expect("cannot generate user config");
+        let res = serde_yml::to_string(&config).expect("cannot generate user config");
         Ok("#cloud-config\n".to_string() + &res)
     }
 }

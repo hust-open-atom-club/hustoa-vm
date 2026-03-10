@@ -53,7 +53,7 @@ impl<'a> Distro for UbuntuInfo<'a> {
             cloud_config_modules: None,
             cloud_final_modules: None,
         };
-        let res = serde_yaml::to_string(&config).expect("cannot generate user config");
+        let res = serde_yml::to_string(&config).expect("cannot generate user config");
         Ok("#cloud-config\n".to_string() + &res)
     }
 }
