@@ -10,6 +10,7 @@ use cmd::distro::SubCmdDistro;
 use cmd::restore_all::SubCmdRestoreAll;
 use cmd::save_all::SubCmdSaveAll;
 use cmd::v6pool::SubCmdV6Pool;
+use cmd::self_update::SubCmdSelfUpdate;
 use cmd::MainCommandsRun;
 use enum_dispatch::enum_dispatch;
 use env_logger;
@@ -43,6 +44,9 @@ enum MainCommands {
 
     /// Restore all running virsh vms (not only hustoa-vm)
     RestoreAll(SubCmdRestoreAll),
+
+    /// Self update the binary from GitHub releases
+    SelfUpdate(SubCmdSelfUpdate),
 }
 
 fn init_env_logger() {
