@@ -10,6 +10,8 @@ pub mod distro;
 pub mod save_all;
 pub mod restore_all;
 pub mod self_update;
+pub mod install_hook;
+pub mod hook;
 
 #[enum_dispatch(MainCommands)]
 pub trait MainCommandsRun {
