@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.1.2] - 2025-10-20
+
+- 修改了部分下载链接（ustc 不再支持通过 wget 下载）
+- 修改 config.toml 中 `libvirt_interface` 配置为 `libvirt_network`
+- 支持自动配置 NAT 端口转发（需要 `hustoa-vm install-hook` ）
+- 支持手动更新软件（`hustoa-vm self-update`）
+
 ## [0.1.1] - 2024-09-17
 
 - 增加了 `hustoa-vm v6-pool list` 命令
@@ -12,3 +19,4 @@
 
 [0.1.0]: https://github.com/hust-open-atom-club/hustoa-vm/releases/tag/v0.1.0
 [0.1.1]: https://github.com/hust-open-atom-club/hustoa-vm/releases/tag/v0.1.1
+[0.1.2]: https://github.com/hust-open-atom-club/hustoa-vm/releases/tag/v0.1.2
