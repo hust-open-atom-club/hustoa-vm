@@ -1,4 +1,4 @@
-use std::{error::Error, net::Ipv6Addr};
+use std::{error::Error, net::Ipv6Addr, str::FromStr};
 use clap::{Args, Subcommand};
 use enum_dispatch::enum_dispatch;
 use crate::{config::HustoaVmConfig, tools::{gen_mac_address_qemu, generate_eui64_from_mac}};
@@ -176,5 +176,95 @@ impl MainCommandsRun for SubCmdV6Pool {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cmd_list_exists() {
+        let _cmd = CmdList;
+    }
+
+    #[test]
+    fn test_cmd_flush_exists() {
+        let _cmd = CmdFlush;
+    }
+
+    #[test]
+    fn test_cmd_purge_exists() {
+        let _cmd = CmdPurge;
+    }
+
+    #[test]
+    fn test_cmd_add_has_fields() {
+        let addr = Ipv6Addr::from_str("2001:db8::1").unwrap();
+        let domain = "test.com".to_string();
+        let cmd = CmdAdd { addr, domain: domain.clone() };
+        assert_eq!(cmd.addr, addr);
+        assert_eq!(cmd.domain, domain);
+    }
+
+    #[test]
+    fn test_cmd_delete_has_field() {
+        let addr = Ipv6Addr::from_str("2001:db8::1").unwrap();
+        let cmd = CmdDelete { addr };
+        assert_eq!(cmd.addr, addr);
+    }
+
+    #[test]
+    fn test_cmd_delete_by_name_has_field() {
+        let name = "testvm".to_string();
+        let cmd = CmdDeleteByName { name: name.clone() };
+        assert_eq!(cmd.name, name);
+    }
+
+    #[test]
+    fn test_cmd_generate_net_define_defaults() {
+        let cmd = CmdGenerateNetDefine {
+            name: "hustoa-netv6".to_string(),
+            iface: "virbr6".to_string(),
+        };
+        assert_eq!(cmd.name, "hustoa-netv6");
+        assert_eq!(cmd.iface, "virbr6");
+    }
+
+    #[test]
+    fn test_cmd_generate_net_define_custom() {
+        let cmd = CmdGenerateNetDefine {
+            name: "custom-net".to_string(),
+            iface: "custom-br".to_string(),
+        };
+        assert_eq!(cmd.name, "custom-net");
+        assert_eq!(cmd.iface, "custom-br");
+    }
+
+    #[test]
+    fn test_ipv6_addr_parsing() {
+        let test_cases = vec![
+            "2001:db8::1",
+            "fd00::100",
+            "fe80::1",
+            "::1",
+        ];
+        for addr_str in test_cases {
+            let addr = Ipv6Addr::from_str(addr_str);
+            assert!(addr.is_ok(), "Should parse IPv6 address: {}", addr_str);
+        }
+    }
+
+    #[test]
+    fn test_ipv6_addr_invalid_parsing() {
+        let test_cases = vec![
+            "invalid",
+            "192.168.1.1",
+            "",
+        ];
+        for addr_str in test_cases {
+            let addr = Ipv6Addr::from_str(addr_str);
+            assert!(addr.is_err(), "Should fail to parse invalid IPv6: {}", addr_str);
+        }
     }
 }

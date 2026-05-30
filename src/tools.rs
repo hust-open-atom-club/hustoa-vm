@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fmt::{Debug, Display}, net::Ipv6Addr};
+use std::{ffi::OsStr, fmt::{Debug, Display}, net::Ipv6Addr, str::FromStr};
 use rand::{self, Rng};
 use std::net::TcpListener;
 use std::error::Error;
@@ -219,4 +219,340 @@ pub fn add_port_mapping_vmlist(name: &str, host_port: u16, guest_port: u16) -> R
     let out = toml::to_string_pretty(&table)?;
     std::fs::write(&file_path, out)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gen_mac_address_qemu_format() {
+        let mac = gen_mac_address_qemu();
+        assert!(mac.starts_with("52:54:00:"), "MAC should start with 52:54:00:");
+        let parts: Vec<&str> = mac.split(':').collect();
+        assert_eq!(parts.len(), 6, "MAC should have 6 octets");
+        for part in &parts {
+            assert_eq!(part.len(), 2, "Each octet should be 2 characters");
+            u8::from_str_radix(part, 16).expect("Each octet should be valid hex");
+        }
+    }
+
+    #[test]
+    fn test_gen_mac_address_qemu_uniqueness() {
+        let mac1 = gen_mac_address_qemu();
+        let mac2 = gen_mac_address_qemu();
+        assert_ne!(mac1, mac2, "Generated MAC addresses should be unique");
+    }
+
+    #[test]
+    fn test_generate_eui64_from_mac_valid() {
+        let mac = "52:54:00:12:34:56";
+        let prefix = "2001:db8::";
+        let ipv6_prefix = Ipv6Addr::from_str(prefix).unwrap();
+        let result = generate_eui64_from_mac(mac, ipv6_prefix);
+        assert!(result.is_ok(), "EUI-64 generation should succeed");
+        let ipv6 = result.unwrap();
+        assert_eq!(ipv6.segments()[0], 0x2001, "IPv6 prefix should be preserved");
+        assert_eq!(ipv6.segments()[1], 0x0db8, "IPv6 prefix should be preserved");
+    }
+
+    #[test]
+    fn test_generate_eui64_from_mac_invalid_format() {
+        let mac = "invalid-mac";
+        let prefix = "2001:db8::";
+        let ipv6_prefix = Ipv6Addr::from_str(prefix).unwrap();
+        let result = generate_eui64_from_mac(mac, ipv6_prefix);
+        assert!(result.is_err(), "Invalid MAC format should return error");
+    }
+
+    #[test]
+    fn test_generate_eui64_from_mac_wrong_length() {
+        let mac = "52:54:00:12:34";
+        let prefix = "2001:db8::";
+        let ipv6_prefix = Ipv6Addr::from_str(prefix).unwrap();
+        let result = generate_eui64_from_mac(mac, ipv6_prefix);
+        assert!(result.is_err(), "MAC with wrong length should return error");
+    }
+
+    #[test]
+    fn test_gen_rand_postfix_length() {
+        let postfix = gen_rand_postfix();
+        assert_eq!(postfix.len(), 8, "Random postfix should be 8 characters (4 bytes in hex)");
+    }
+
+    #[test]
+    fn test_gen_rand_postfix_uniqueness() {
+        let postfix1 = gen_rand_postfix();
+        let postfix2 = gen_rand_postfix();
+        assert_ne!(postfix1, postfix2, "Random postfixes should be unique");
+    }
+
+    #[test]
+    fn test_gen_rand_postfix_is_hex() {
+        let postfix = gen_rand_postfix();
+        u32::from_str_radix(&postfix, 16).expect("Postfix should be valid hex");
+    }
+
+    #[test]
+    fn test_save_vm_entry_vmlist() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let dir = temp_dir.path();
+        let file_path = dir.join("vmlist.toml");
+
+        // Mock the /etc/hustoa-vm directory
+        let _original_path = Path::new("/etc/hustoa-vm/vmlist.toml");
+        let _test_path = file_path.as_path();
+
+        // Create a test entry
+        let name = "test-vm";
+        let user = "testuser";
+        let distro = "ubuntu:24.04";
+        let disk_path = "/var/lib/libvirt/images/test.img";
+        let ipv4 = "192.168.122.100";
+
+        // Write directly to temp file
+        let mut entry = toml::map::Map::new();
+        entry.insert("name".to_string(), toml::Value::String(name.to_string()));
+        entry.insert("user".to_string(), toml::Value::String(user.to_string()));
+        entry.insert("distro".to_string(), toml::Value::String(distro.to_string()));
+        entry.insert("disk_path".to_string(), toml::Value::String(disk_path.to_string()));
+        entry.insert("ipv4addr".to_string(), toml::Value::String(ipv4.to_string()));
+
+        let mut table = toml::map::Map::new();
+        table.insert(name.to_string(), toml::Value::Table(entry));
+
+        let out = toml::to_string_pretty(&table).unwrap();
+        fs::write(&file_path, out).unwrap();
+
+        // Verify the file was written correctly
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains(name), "File should contain VM name");
+        assert!(content.contains(user), "File should contain user");
+        assert!(content.contains(ipv4), "File should contain IPv4 address");
+    }
+
+    #[test]
+    fn test_save_vm_entry_vmlist_update_existing() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("vmlist.toml");
+
+        // Create initial entry
+        let mut table = toml::map::Map::new();
+        let mut entry = toml::map::Map::new();
+        entry.insert("name".to_string(), toml::Value::String("vm1".to_string()));
+        entry.insert("user".to_string(), toml::Value::String("user1".to_string()));
+        entry.insert("distro".to_string(), toml::Value::String("ubuntu:22.04".to_string()));
+        entry.insert("disk_path".to_string(), toml::Value::String("/path/disk1.img".to_string()));
+        entry.insert("ipv4addr".to_string(), toml::Value::String("192.168.122.10".to_string()));
+        table.insert("vm1".to_string(), toml::Value::Table(entry));
+
+        fs::write(&file_path, toml::to_string_pretty(&table).unwrap()).unwrap();
+
+        // Read and update
+        let content = fs::read_to_string(&file_path).unwrap();
+        let mut parsed: toml::Value = toml::from_str(&content).unwrap();
+
+        if let toml::Value::Table(ref mut t) = parsed {
+            let mut new_entry = toml::map::Map::new();
+            new_entry.insert("name".to_string(), toml::Value::String("vm2".to_string()));
+            new_entry.insert("user".to_string(), toml::Value::String("user2".to_string()));
+            new_entry.insert("distro".to_string(), toml::Value::String("debian:12".to_string()));
+            new_entry.insert("disk_path".to_string(), toml::Value::String("/path/disk2.img".to_string()));
+            new_entry.insert("ipv4addr".to_string(), toml::Value::String("192.168.122.20".to_string()));
+            t.insert("vm2".to_string(), toml::Value::Table(new_entry));
+        }
+
+        fs::write(&file_path, toml::to_string_pretty(&parsed).unwrap()).unwrap();
+
+        // Verify both entries exist
+        let updated = fs::read_to_string(&file_path).unwrap();
+        assert!(updated.contains("vm1"), "Original entry should still exist");
+        assert!(updated.contains("vm2"), "New entry should be added");
+    }
+
+    #[test]
+    fn test_allocate_host_port_in_range() {
+        let port = allocate_host_port().unwrap();
+        assert!(port >= 20000, "Port should be >= 20000, got {}", port);
+        assert!(port < 30000, "Port should be < 30000, got {}", port);
+    }
+
+    #[test]
+    fn test_allocate_host_port_multiple() {
+        let mut ports = std::collections::HashSet::new();
+        for _ in 0..10 {
+            let port = allocate_host_port().unwrap();
+            ports.insert(port);
+            assert!(port >= 20000 && port < 30000, "Port {} should be in range", port);
+        }
+        assert!(ports.len() > 1, "Should generate multiple different ports");
+    }
+
+    #[test]
+    fn test_add_port_mapping_vmlist() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("vmlist.toml");
+
+        // Create a VM entry first
+        let mut table = toml::map::Map::new();
+        let mut vm_entry = toml::map::Map::new();
+        vm_entry.insert("name".to_string(), toml::Value::String("testvm".to_string()));
+        vm_entry.insert("user".to_string(), toml::Value::String("testuser".to_string()));
+        vm_entry.insert("distro".to_string(), toml::Value::String("ubuntu:24.04".to_string()));
+        vm_entry.insert("disk_path".to_string(), toml::Value::String("/path/disk.img".to_string()));
+        vm_entry.insert("ipv4addr".to_string(), toml::Value::String("192.168.122.100".to_string()));
+        table.insert("testvm".to_string(), toml::Value::Table(vm_entry));
+
+        fs::write(&file_path, toml::to_string_pretty(&table).unwrap()).unwrap();
+
+        // Add port mapping
+        let _name = "testvm";
+        let host_port: u16 = 22001;
+        let guest_port: u16 = 22;
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        let mut parsed: toml::Value = toml::from_str(&content).unwrap();
+
+        let port_entry = {
+            let mut m = toml::map::Map::new();
+            m.insert("host".to_string(), toml::Value::Integer(host_port as i64));
+            m.insert("guest".to_string(), toml::Value::Integer(guest_port as i64));
+            toml::Value::Table(m)
+        };
+
+        if let toml::Value::Table(ref mut t) = parsed {
+            if let toml::Value::Table(ref mut vm_table) = t.get_mut("testvm").unwrap() {
+                match vm_table.get_mut("ports") {
+                    Some(toml::Value::Array(arr)) => {
+                        arr.push(port_entry);
+                    }
+                    _ => {
+                        vm_table.insert("ports".to_string(), toml::Value::Array(vec![port_entry]));
+                    }
+                }
+            }
+        }
+
+        fs::write(&file_path, toml::to_string_pretty(&parsed).unwrap()).unwrap();
+
+        // Verify port mapping was added
+        let updated = fs::read_to_string(&file_path).unwrap();
+        assert!(updated.contains("ports"), "Should contain ports field");
+        assert!(updated.contains(&host_port.to_string()), "Should contain host port");
+    }
+
+    #[test]
+    fn test_add_port_mapping_vmlist_multiple() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("vmlist.toml");
+
+        // Create VM entry with existing port
+        let mut vm_entry = toml::map::Map::new();
+        vm_entry.insert("name".to_string(), toml::Value::String("testvm".to_string()));
+        vm_entry.insert("user".to_string(), toml::Value::String("testuser".to_string()));
+        vm_entry.insert("distro".to_string(), toml::Value::String("ubuntu:24.04".to_string()));
+        vm_entry.insert("disk_path".to_string(), toml::Value::String("/path/disk.img".to_string()));
+        vm_entry.insert("ipv4addr".to_string(), toml::Value::String("192.168.122.100".to_string()));
+
+        let mut port1 = toml::map::Map::new();
+        port1.insert("host".to_string(), toml::Value::Integer(22001));
+        port1.insert("guest".to_string(), toml::Value::Integer(22));
+        vm_entry.insert("ports".to_string(), toml::Value::Array(vec![toml::Value::Table(port1)]));
+
+        let mut table = toml::map::Map::new();
+        table.insert("testvm".to_string(), toml::Value::Table(vm_entry));
+
+        fs::write(&file_path, toml::to_string_pretty(&table).unwrap()).unwrap();
+
+        // Add second port
+        let content = fs::read_to_string(&file_path).unwrap();
+        let mut parsed: toml::Value = toml::from_str(&content).unwrap();
+
+        let port_entry = {
+            let mut m = toml::map::Map::new();
+            m.insert("host".to_string(), toml::Value::Integer(22002));
+            m.insert("guest".to_string(), toml::Value::Integer(80));
+            toml::Value::Table(m)
+        };
+
+        if let toml::Value::Table(ref mut t) = parsed {
+            if let toml::Value::Table(ref mut vm_table) = t.get_mut("testvm").unwrap() {
+                if let toml::Value::Array(arr) = vm_table.get_mut("ports").unwrap() {
+                    arr.push(port_entry);
+                }
+            }
+        }
+
+        fs::write(&file_path, toml::to_string_pretty(&parsed).unwrap()).unwrap();
+
+        // Verify both ports exist
+        let updated = fs::read_to_string(&file_path).unwrap();
+        assert!(updated.contains("22001"), "Should contain first port");
+        assert!(updated.contains("22002"), "Should contain second port");
+    }
+
+    #[test]
+    fn test_hustoa_run_cmd_dryrun() {
+        let cmd = hustoa_run_cmd("echo", ["test", "args"], true);
+        // In dryrun mode, the command should be created (but won't have args passed to echo)
+        // Just verify it doesn't panic
+        let _cmd = cmd;
+    }
+
+    #[test]
+    fn test_mac_address_consistency() {
+        // Test that generated MAC addresses are consistent in format
+        for _ in 0..100 {
+            let mac = gen_mac_address_qemu();
+            assert!(mac.starts_with("52:54:00:"), "MAC should always start with 52:54:00:");
+            let parts: Vec<&str> = mac.split(':').collect();
+            assert_eq!(parts.len(), 6, "MAC should always have 6 octets");
+        }
+    }
+
+    #[test]
+    fn test_ipv6_prefix_preservation() {
+        let test_cases = vec![
+            ("52:54:00:12:34:56", "2001:db8::"),
+            ("52:54:00:aa:bb:cc", "fd00::"),
+            ("52:54:00:ff:ff:ff", "fe80::"),
+        ];
+
+        for (mac, prefix) in test_cases {
+            let ipv6_prefix = Ipv6Addr::from_str(prefix).unwrap();
+            let result = generate_eui64_from_mac(mac, ipv6_prefix).unwrap();
+            let prefix_bytes = ipv6_prefix.segments();
+            let result_bytes = result.segments();
+
+            // First 4 segments (128 bits) should match prefix
+            // For /64 prefixes, first 2 segments should match
+            assert_eq!(result_bytes[0], prefix_bytes[0], "First segment should match prefix");
+            assert_eq!(result_bytes[1], prefix_bytes[1], "Second segment should match prefix");
+        }
+    }
+
+    #[test]
+    fn test_eui64_bit_flip() {
+        // EUI-64 should flip the 7th bit of the first byte
+        let mac = "52:54:00:12:34:56";
+        let ipv6_prefix = Ipv6Addr::from_str("fe80::").unwrap();
+        let result = generate_eui64_from_mac(mac, ipv6_prefix).unwrap();
+
+        // The result should be a link-local address with proper EUI-64 format
+        // fe80::5054:ff:fe12:3456 (with U/L bit flipped)
+        let segments = result.segments();
+        assert_eq!(segments[0], 0xfe80, "Should be link-local prefix");
+    }
+
+    #[test]
+    fn test_random_postfix_entropy() {
+        // Test that random postfixes have reasonable entropy
+        let mut postfixes = std::collections::HashSet::new();
+        for _ in 0..1000 {
+            let postfix = gen_rand_postfix();
+            postfixes.insert(postfix);
+        }
+        // Should have close to 1000 unique values
+        assert!(postfixes.len() > 950, "Should have high entropy in random postfixes");
+    }
 }

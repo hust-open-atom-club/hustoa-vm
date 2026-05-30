@@ -124,3 +124,117 @@ lazy_static! {
         info
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_distro_ubuntu() {
+        let distro = get_distro("ubuntu");
+        assert!(distro.is_ok(), "Should get Ubuntu distro");
+        let ubuntu = distro.unwrap();
+        assert_eq!(ubuntu.name(), "ubuntu");
+    }
+
+    #[test]
+    fn test_get_distro_debian() {
+        let distro = get_distro("debian");
+        assert!(distro.is_ok(), "Should get Debian distro");
+        let debian = distro.unwrap();
+        assert_eq!(debian.name(), "debian");
+    }
+
+    #[test]
+    fn test_get_distro_archlinux() {
+        let distro = get_distro("archlinux");
+        assert!(distro.is_ok(), "Should get ArchLinux distro");
+        let arch = distro.unwrap();
+        assert_eq!(arch.name(), "archlinux");
+    }
+
+    #[test]
+    fn test_get_distro_unsupported() {
+        let distro = get_distro("fedora");
+        assert!(distro.is_err(), "Should error on unsupported distro");
+    }
+
+    #[test]
+    fn test_distro_info_list_not_empty() {
+        assert!(!distro_version.distro.is_empty(), "Distro list should not be empty");
+    }
+
+    #[test]
+    fn test_ubuntu_in_distro_list() {
+        let ubuntu_found = distro_version.distro.iter().any(|d| d.name == "ubuntu");
+        assert!(ubuntu_found, "Ubuntu should be in distro list");
+    }
+
+    #[test]
+    fn test_debian_in_distro_list() {
+        let debian_found = distro_version.distro.iter().any(|d| d.name == "debian");
+        assert!(debian_found, "Debian should be in distro list");
+    }
+
+    #[test]
+    fn test_all_distros_have_latest_version() {
+        for distro in &distro_version.distro {
+            assert!(!distro.latest_version.is_empty(), "{} should have latest_version", distro.name);
+        }
+    }
+
+    #[test]
+    fn test_all_distros_have_versions() {
+        for distro in &distro_version.distro {
+            assert!(!distro.versions.is_empty(), "{} should have versions", distro.name);
+        }
+    }
+
+    #[test]
+    fn test_all_versions_have_name() {
+        for distro in &distro_version.distro {
+            for version in &distro.versions {
+                assert!(!version.name.is_empty(), "Version should have a name");
+            }
+        }
+    }
+
+    #[test]
+    fn test_ubuntu_versions_have_osinfo() {
+        let ubuntu = distro_version.distro.iter().find(|d| d.name == "ubuntu").unwrap();
+        for version in &ubuntu.versions {
+            assert!(!version.osinfo_conf.is_empty(), "Ubuntu version {} should have osinfo_conf", version.name);
+        }
+    }
+
+    #[test]
+    fn test_debian_versions_have_osinfo() {
+        let debian = distro_version.distro.iter().find(|d| d.name == "debian").unwrap();
+        for version in &debian.versions {
+            assert!(!version.osinfo_conf.is_empty(), "Debian version {} should have osinfo_conf", version.name);
+        }
+    }
+
+    #[test]
+    fn test_get_version_valid() {
+        let ubuntu = distro_version.distro.iter().find(|d| d.name == "ubuntu").unwrap();
+        let version = get_version(ubuntu, &"22.04".to_string());
+        assert!(version.is_ok(), "Should find valid version");
+    }
+
+    #[test]
+    fn test_get_version_by_alias() {
+        let ubuntu = distro_version.distro.iter().find(|d| d.name == "ubuntu").unwrap();
+        let version = get_version(ubuntu, &"jammy".to_string());
+        assert!(version.is_ok(), "Should find version by alias");
+        // When using alias, the returned name is the canonical name
+        assert!(version.unwrap().alias.contains(&"22.04".to_string()), "Version should have 22.04 as alias");
+    }
+
+    #[test]
+    fn test_get_version_invalid() {
+        let ubuntu = distro_version.distro.iter().find(|d| d.name == "ubuntu").unwrap();
+        let version = get_version(ubuntu, &"99.99".to_string());
+        assert!(version.is_err(), "Should error on invalid version");
+    }
+}
