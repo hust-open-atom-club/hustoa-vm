@@ -119,6 +119,64 @@ hustoa-vm create \
 
 按需调整配置即可。如果提供了 `--user` 选项，创建虚拟机时使用的默认用户名则来源于该选项，否则将 fallback 到 `--name` 的值。
 
+### 端口转发
+
+端口转发使用宿主机的 `iptables` 实现。创建虚拟机时，工具会在 `20000` 到 `29999` 范围内自动分配一个宿主机 TCP 端口，并将其转发到虚拟机的 SSH 端口 `22`。端口映射会保存到 `/etc/hustoa-vm/vmlist.toml`。
+
+建议在创建虚拟机前安装 libvirt hook：
+
+```bash
+sudo hustoa-vm install-hook
+```
+
+该命令会安装 `/etc/libvirt/hooks/qemu`。虚拟机启动时 hook 会重新添加转发规则，停止时会删除规则，因此宿主机重启后也能自动恢复。若该文件已存在，原文件会备份为 `/etc/libvirt/hooks/qemu.bak`。宿主机需要安装 `iptables`，并确保 `hustoa-vm` 已安装在 `/usr/local/bin/hustoa-vm`。
+
+创建完成后查看端口映射：
+
+```bash
+sudo cat /etc/hustoa-vm/vmlist.toml
+```
+
+例如：
+
+```toml
+ipv4addr = "192.168.100.155"
+
+[[hustoa-vm-sophie-ubuntu-ae8b874d.ports]]
+host = 24098
+guest = 22
+```
+
+然后通过宿主机 IP 连接虚拟机：
+
+```bash
+ssh -p 24098 sophie@<宿主机IP>
+```
+
+当前没有单独添加端口的命令。若要把宿主机 `28080` 转发到某个虚拟机的 HTTP 端口 `80`，在对应虚拟机的配置下追加：
+
+```toml
+[[hustoa-vm-sophie-ubuntu-ae8b874d.ports]]
+host = 28080
+guest = 80
+```
+
+将示例中的虚拟机名称替换为实际名称即可。
+
+编辑完成后，可重启虚拟机，或直接应用规则：
+
+```bash
+sudo hustoa-vm hook <虚拟机名称> prepare
+```
+
+当前实现只处理 TCP 端口。删除映射时，应先在映射仍存在于 `vmlist.toml` 时执行 `release`，再删除配置：
+
+```bash
+sudo hustoa-vm hook <虚拟机名称> release
+```
+
+创建时如果没有成功解析到虚拟机 IPv4，映射记录仍可能被写入，但当前 hook 不会自动重新解析地址；需要先修正 `ipv4addr` 后再应用规则。
+
 **发行版支持**
 
 使用如下命令可列出当前工具支持的 Linux 发行版本：
